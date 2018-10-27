@@ -22,6 +22,8 @@ namespace QBDiscordAssistant.Discord
         // TODO: Move all of the implementation to the BotCommandHandler methods so that they can be unit tested.
         // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
         // that they're not going to be looking at their DMs.
+        // TODO: Look into abstracting away some of the "get members of X". Should simplify the permissions setting.
+        // TODO: Directors still aren't able to see channels.
 
         // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
@@ -44,7 +46,7 @@ namespace QBDiscordAssistant.Discord
                     // TODO: Should we just store directors here instead of in BotPermissions?
                     manager.PendingTournaments[tournamentName] = new TournamentState()
                     {
-                        Directors = directors.ToArray(),
+                        Directors = directors,
                         GuildId = context.Guild.Id,
                         Name = tournamentName,
                         Stage = TournamentStage.Created
@@ -407,13 +409,34 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament != null)
                 {
-                    await CleanupTournamentArtifcats(context);
+                    await CleanupTournamentArtifcats(context, manager.CurrentTournament);
 
                     string tournamentName = manager.CurrentTournament.Name;
                     manager.CurrentTournament = null;
                     await context.Channel.SendMessageAsync($"Tournament '{tournamentName}' has finished.");
                 }
             }
+        }
+
+        [Command("quick")]
+        [Description("Delete. Adds default teams and round robins. Still needs assigned reader and added players.")]
+        public Task Quick(CommandContext context)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                manager.CurrentTournament.Teams.Add(new Team()
+                {
+                    Name = "Team1"
+                });
+                manager.CurrentTournament.Teams.Add(new Team()
+                {
+                    Name = "Team2"
+                });
+                manager.CurrentTournament.RoundRobinsCount = 2;
+            }
+
+            return Task.CompletedTask;
         }
 
         // Commands:
@@ -486,6 +509,8 @@ namespace QBDiscordAssistant.Discord
                 Permissions.KickMembers |
                 Permissions.MuteMembers |
                 Permissions.DeafenMembers |
+                Permissions.ReadMessageHistory |
+                Permissions.AccessChannels |
                 prioritySpeaker);
 
             // Create the voice channels
@@ -549,6 +574,7 @@ namespace QBDiscordAssistant.Discord
                 Permissions.AccessChannels | Permissions.SendMessages | Permissions.ReadMessageHistory;
             await channel.AddOverwriteAsync(roomRole, allowedPermissions, Permissions.None);
 
+            // TODO TODO: Reader doesn't seem to get permission to the text channels!
             // Grants the room role to the players, reader, and the admins.
             DiscordMember readerMember = await context.Guild.GetMemberAsync(game.Reader.Id);
             List<Task> grantRoomRole = new List<Task>();
@@ -593,9 +619,8 @@ namespace QBDiscordAssistant.Discord
         }
 
         // Removes channels and roles.
-        private static async Task CleanupTournamentArtifcats(CommandContext context)
+        private static async Task CleanupTournamentArtifcats(CommandContext context, TournamentState state)
         {
-            TournamentState state = context.Dependencies.GetDependency<TournamentState>();
             // Simplest way is to delete all channels that are not a main channel
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
             List<Task> deleteChannelsTask = new List<Task>();
@@ -619,7 +644,10 @@ namespace QBDiscordAssistant.Discord
             // They all start with Role_. This will make sure that, even if a reader is removed from the list somehow,
             // we get all of the roles
             List<Task> deleteRolesTask = new List<Task>();
-            foreach (DiscordRole role in context.Guild.Roles.Where(r => r.Name.StartsWith("Round_")))
+            
+            // We need this out of the loop because the role could be deleted while we are enumerating through it.
+            DiscordRole[] roomRoles = context.Guild.Roles.Where(r => r.Name.StartsWith("Round_")).ToArray();
+            foreach (DiscordRole role in roomRoles)
             {
                 deleteRolesTask.Add(context.Guild.DeleteRoleAsync(role));
             }

@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Globalization;
 
 namespace QBDiscordAssistant.Tournament
 {
@@ -12,7 +11,7 @@ namespace QBDiscordAssistant.Tournament
         {
             if (obj is Team otherTeam)
             {
-                return this.Name == otherTeam.Name;
+                return this.Name.Equals(otherTeam.Name, StringComparison.CurrentCultureIgnoreCase);
             }
 
             return false;
@@ -20,7 +19,7 @@ namespace QBDiscordAssistant.Tournament
 
         public override int GetHashCode()
         {
-            return this.Name.GetHashCode();
+            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode();
         }
     }
 }

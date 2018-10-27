@@ -9,7 +9,7 @@ namespace QBDiscordAssistant.Discord
     {
         public BotPermissions()
         {
-            this.PossibleDirectors = new Dictionary<string, ISet<Director>>();
+            this.PossibleDirectors = new Dictionary<string, ISet<Director>>(StringComparer.CurrentCultureIgnoreCase);
             this.AdminIds = new List<ulong>();
         }
 

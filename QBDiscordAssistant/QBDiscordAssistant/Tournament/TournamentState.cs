@@ -8,7 +8,7 @@ namespace QBDiscordAssistant.Tournament
     {
         public TournamentState()
         {
-            this.Directors = new Director[0];
+            this.Directors = new HashSet<Director>();
             this.Players = new HashSet<Player>();
             this.Teams = new HashSet<Team>();
             this.Readers = new HashSet<Reader>();
@@ -20,7 +20,8 @@ namespace QBDiscordAssistant.Tournament
         public ulong GuildId { get; set; }
 
         // TODO: Reconcile this with BotPermissions
-        public Director[] Directors { get; set; }
+        // TODO: Consider making this Ids
+        public ISet<Director> Directors { get; set; }
 
         public TournamentStage Stage { get; set; }
 
