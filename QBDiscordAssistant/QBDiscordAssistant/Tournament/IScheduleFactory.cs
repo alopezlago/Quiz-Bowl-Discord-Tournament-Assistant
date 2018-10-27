@@ -4,6 +4,6 @@ namespace QBDiscordAssistant.Tournament
 {
     public interface IScheduleFactory
     {
-        Schedule Generate(IList<Team> teams, IList<Reader> readers);
+        Schedule Generate(ISet<Team> teams, ISet<Reader> readers);
     }
 }

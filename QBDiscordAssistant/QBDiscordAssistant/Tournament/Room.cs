@@ -6,6 +6,8 @@ namespace QBDiscordAssistant.Tournament
 {
     public class Room
     {
+        // TODO: We may not need this if we can get the channels from the name. We may also just have a separate
+        // Channel class which has the Room in it.
         public ulong Id { get; set; }
 
         public string Name { get; set; }

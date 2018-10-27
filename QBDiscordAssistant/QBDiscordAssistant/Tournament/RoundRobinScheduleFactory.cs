@@ -18,7 +18,7 @@ namespace QBDiscordAssistant.Tournament
             this.roundRobins = roundRobins;
         }
 
-        public Schedule Generate(IList<Team> teams, IList<Reader> readers)
+        public Schedule Generate(ISet<Team> teams, ISet<Reader> readers)
         {
             if (teams.Count <= 1)
             {
@@ -63,7 +63,7 @@ namespace QBDiscordAssistant.Tournament
             return schedule;
         }
 
-        private Round GenerateRound(int roundNumber, Team[] topRow, Team[] bottomRow, IList<Reader> readers, bool hasBye)
+        private Round GenerateRound(int roundNumber, Team[] topRow, Team[] bottomRow, ISet<Reader> readers, bool hasBye)
         {
             int gamesCount = hasBye ? topRow.Length - 1 : topRow.Length;
             Round round = new Round();

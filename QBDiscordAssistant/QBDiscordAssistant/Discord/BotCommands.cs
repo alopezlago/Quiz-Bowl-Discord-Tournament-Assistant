@@ -1,11 +1,10 @@
-﻿using DSharpPlus.CommandsNext;
+﻿using DSharpPlus;
+using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using QBDiscordAssistant.Tournament;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.Discord
@@ -360,8 +359,13 @@ namespace QBDiscordAssistant.Discord
                 manager.CurrentTournament.Stage = TournamentStage.BotSetup;
                 await context.Channel.SendMessageAsync("Initializing the schedule...");
 
-                // TODO: Add bot initialization logic, where we set up the schedule and the channels.
+                // TODO: We should try to move this out of the Bot class.
+                IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(manager.CurrentTournament.RoundRobinsCount);
+                manager.CurrentTournament.Schedule = scheduleFactory.Generate(
+                    manager.CurrentTournament.Teams, manager.CurrentTournament.Readers);
+                await CreateChannels(context, manager.CurrentTournament);
 
+                manager.CurrentTournament.Stage = TournamentStage.Running;
                 await context.Channel.SendMessageAsync("Starting the tournament...");
             }
 
@@ -370,20 +374,20 @@ namespace QBDiscordAssistant.Discord
 
         [Command("end")]
         [Description("Ends the tournament.")]
-        public Task End(CommandContext context, string rawTeamName)
+        public async Task End(CommandContext context, string rawTeamName)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament != null)
                 {
+                    await CleanupTournamentArtifcats(context);
+
                     string tournamentName = manager.CurrentTournament.Name;
                     manager.CurrentTournament = null;
-                    return context.Channel.SendMessageAsync($"Tournament '{tournamentName}' has finished.");
+                    await context.Channel.SendMessageAsync($"Tournament '{tournamentName}' has finished.");
                 }
             }
-
-            return Task.CompletedTask;
         }
 
         // Commands:
@@ -412,20 +416,141 @@ namespace QBDiscordAssistant.Discord
         //
         // !win <team name> [reader] (Optional, do this only if we have time)
 
+        private static async Task CreateChannels(CommandContext context, TournamentState state)
+        {
+            // Create the reader role
+            DiscordRole readerRole = await context.Guild.CreateRoleAsync("Reader", color: DiscordColor.Orange, permissions:
+                Permissions.UseVoiceDetection |
+                Permissions.UseVoice |
+                Permissions.Speak |
+                Permissions.SendMessages |
+                Permissions.KickMembers |
+                Permissions.MuteMembers);
 
-        public static bool IsMainChannel(CommandContext context)
+            // Create the voice channels
+            List<Task> createChannelsTasks = new List<Task>();
+            ////List<Task> deleteExistingChannelsTasks = new List<Task>();
+            foreach (Reader reader in state.Readers)
+            {
+                // TODO: See what happens if we try to create an existing channel. If it's bad, then delete channels
+                // whose names overlap.
+                createChannelsTasks.Add(CreateVoiceChannel(context, reader, readerRole));
+            }
+
+            // Create the text channels
+            int roundNumber = 1;
+            foreach (Round round in state.Schedule.Rounds)
+            {
+                foreach (Game game in round.Games)
+                {
+                    createChannelsTasks.Add(CreateTextChannel(context, state, game, roundNumber));
+                }
+
+                roundNumber++;
+            }
+
+            await Task.WhenAll(createChannelsTasks);
+            await context.Channel.SendMessageAsync("Tournament channels have been created.");
+        }
+
+        private static async Task CreateVoiceChannel(CommandContext context, Reader reader, DiscordRole readerRole)
+        {
+            string name = $"{reader.Name}'s_Voice_Room";
+            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice);
+            DiscordMember readerMember = await context.Guild.GetMemberAsync(reader.Id);
+            await context.Guild.GrantRoleAsync(readerMember, readerRole);
+        }
+
+        private static async Task CreateTextChannel(
+            CommandContext context, TournamentState state, Game game, int roundNumber)
+        {
+            // The room and role names will be the same.
+            string name = GetTextRoomName(game.Reader, roundNumber);
+            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Text);
+            DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
+            await channel.AddOverwriteAsync(context.Guild.EveryoneRole, Permissions.None, Permissions.None);
+            await channel.AddOverwriteAsync(
+                roomRole, Permissions.AccessChannels | Permissions.SendMessages, Permissions.None);
+
+            // Grants the room role to the players, reader, and the admins.
+            DiscordMember readerMember = await context.Guild.GetMemberAsync(game.Reader.Id);
+            List<Task> grantRoomRole = new List<Task>();
+            grantRoomRole.Add(context.Guild.GrantRoleAsync(readerMember, roomRole));
+            IEnumerable<DiscordMember> admins = context.Guild.Members
+                .Where(member => member.Roles
+                    .Any(role => role.CheckPermission(Permissions.Administrator) == PermissionLevel.Allowed));
+            foreach (DiscordMember admin in admins)
+            {
+                grantRoomRole.Add(context.Guild.GrantRoleAsync(admin, roomRole));
+            }
+
+            IEnumerable<DiscordMember> playerMembers = await Task.WhenAll(state.Players
+                .Join(game.Teams, player => player.Team, team => team, (player, team) => player.Id)
+                .Select(id => context.Guild.GetMemberAsync(id)));
+            foreach (DiscordMember playerMember in playerMembers)
+            {
+                grantRoomRole.Add(context.Guild.GrantRoleAsync(playerMember, roomRole));
+            }
+
+            await Task.WhenAll(grantRoomRole);
+        }
+
+        // Removes channels and roles.
+        private static async Task CleanupTournamentArtifcats(CommandContext context)
+        {
+            TournamentState state = context.Dependencies.GetDependency<TournamentState>();
+            // Simplest way is to delete all channels that are not a main channel
+            BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
+            List<Task> deleteChannelsTask = new List<Task>();
+            foreach (DiscordChannel channel in context.Guild.Channels)
+            {
+                // This should only be accepted on the main channel.
+                if (channel != context.Channel)
+                {
+                    deleteChannelsTask.Add(channel.DeleteAsync("Tournament is over."));
+                }
+            }
+
+            // Remove the reader role
+            DiscordRole readerRole = context.Guild.Roles.FirstOrDefault(r => r.Name == "Reader");
+            if (readerRole != null)
+            {
+                await context.Guild.DeleteRoleAsync(readerRole);
+            }
+
+            // TODO: Remove the channel roles
+            // They all start with Role_. This will make sure that, even if a reader is removed from the list somehow,
+            // we get all of the roles
+            List<Task> deleteRolesTask = new List<Task>();
+            foreach (DiscordRole role in context.Guild.Roles.Where(r => r.Name.StartsWith("Round_")))
+            {
+                deleteRolesTask.Add(context.Guild.DeleteRoleAsync(role));
+            }
+
+            await Task.WhenAll(deleteChannelsTask);
+            await Task.WhenAll(deleteRolesTask);
+            await context.Channel.SendMessageAsync("All tournament channels and roles removed.");
+        }
+
+        private static string GetTextRoomName(Reader reader, int roundNumber)
+        {
+            return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_")}";
+        }
+
+        private static bool IsMainChannel(CommandContext context)
         {
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
             return context.Channel.Name == configuration.MainChannelName;
         }
 
-        public static bool IsAdminUser(CommandContext context)
+        // TODO: Look into using "RequiredRole" instead of this.
+        private static bool IsAdminUser(CommandContext context)
         {
             BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
             return permissions.AdminIds.Contains(context.User.Id);
         }
 
-        public static bool HasTournamentDirectorPrivileges(CommandContext context)
+        private static bool HasTournamentDirectorPrivileges(CommandContext context)
         {
             if (IsAdminUser(context))
             {
