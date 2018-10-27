@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="DSharpPlus" Version="3.2.3" />
+    <PackageReference Include="DSharpPlus.CommandsNext" Version="3.2.3" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  
+  <!-- Once we have need of these items, copy them-->
+  <!-- The txt files aren't automatically copied to the bin folder-->
+  <!--<ItemGroup>
+    <None Include="discordToken.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="config.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>-->
+
+</Project>
