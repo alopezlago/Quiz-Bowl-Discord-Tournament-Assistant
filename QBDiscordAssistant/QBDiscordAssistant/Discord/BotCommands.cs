@@ -25,11 +25,12 @@ namespace QBDiscordAssistant.Discord
         [Description("Adds a tournament director to a tournament, and creates that tournament if it doesn't exist yet.")]
         [RequireOwner]
         [RequirePermissions(Permissions.Administrator)]
-        public Task AddTournamentDirector(CommandContext context, DiscordMember newDirector, params string[] rawTournamentNameArray)
+        public Task AddTournamentDirector(
+            CommandContext context, DiscordMember newDirector, params string[] tournamentNameParts)
         {
             if (IsMainChannel(context))
             {
-                string tournamentName = string.Join(" ", rawTournamentNameArray).Trim();
+                string tournamentName = string.Join(" ", tournamentNameParts).Trim();
                 BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
                 if (!permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors))
                 {
@@ -62,11 +63,12 @@ namespace QBDiscordAssistant.Discord
         [Description("Removes a tournament director from a tournament.")]
         [RequireOwner]
         [RequirePermissions(Permissions.Administrator)]
-        public Task RemoveTournamentDirector(CommandContext context, DiscordMember newDirector, string rawTournamentName)
+        public Task RemoveTournamentDirector(
+            CommandContext context, DiscordMember newDirector, params string[] tournamentNameParts)
         {
             if (IsMainChannel(context))
             {
-                string tournamentName = rawTournamentName.Trim();
+                string tournamentName = string.Join(" ", tournamentNameParts).Trim();
                 BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
                 if (permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors))
                 {
@@ -84,14 +86,14 @@ namespace QBDiscordAssistant.Discord
 
         [Command("getCurrentTournament")]
         [Description("Gets the name of the current tournament, if it exists.")]
-        public Task GetCurrentTournament(CommandContext context, string rawTournamentName)
+        public Task GetCurrentTournament(CommandContext context)
         {
             if (IsMainChannel(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament != null)
                 {
-                    return context.Channel.SendMessageAsync($"Current tournament name is: {manager.CurrentTournament.Name}");
+                    return context.Channel.SendMessageAsync($"Current tournament: {manager.CurrentTournament.Name}");
                 }
                 else
                 {
@@ -104,15 +106,15 @@ namespace QBDiscordAssistant.Discord
 
         [Command("setup")]
         [Description("Begins the setup phase of the tournament, where readers and teams can be added.")]
-        public Task Setup(CommandContext context, string rawTournamentName)
+        public Task Setup(CommandContext context, params string[] rawTournamentNameParts)
         {
             if (!IsMainChannel(context))
             {
                 return Task.CompletedTask;
             }
 
-            // We really need to refactor permissions so it's just the ID.
-            string tournamentName = rawTournamentName.Trim();
+            // We really need to refactor BotPermissions so that we use only the ID.
+            string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
             BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
             if (IsAdminUser(context) ||
                 (permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors) &&
@@ -175,14 +177,15 @@ namespace QBDiscordAssistant.Discord
 
         [Command("addTeam")]
         [Description("Add a team.")]
-        public Task AddTeam(CommandContext context, string rawTeamName)
+        public Task AddTeam(CommandContext context, params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
+                string teamName = string.Join(" ", rawTeamNameParts).Trim();
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament.Teams.Add(new Team()
                 {
-                    Name = rawTeamName.Trim()
+                    Name = teamName
                 }))
                 {
                     return context.Channel.SendMessageAsync("Team added.");
@@ -198,14 +201,15 @@ namespace QBDiscordAssistant.Discord
 
         [Command("removeTeam")]
         [Description("Removes a team.")]
-        public Task RemoveTeam(CommandContext context, string rawTeamName)
+        public Task RemoveTeam(CommandContext context, params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
+                string teamName = string.Join(" ", rawTeamNameParts).Trim();
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament.Teams.Remove(new Team()
                 {
-                    Name = rawTeamName.Trim()
+                    Name = teamName
                 }))
                 {
                     return context.Channel.SendMessageAsync("Team removed.");
@@ -221,11 +225,11 @@ namespace QBDiscordAssistant.Discord
 
         [Command("addPlayer")]
         [Description("Adds a player to a team.")]
-        public Task AddPlayer(CommandContext context, DiscordMember member, string rawTeamName)
+        public Task AddPlayer(CommandContext context, DiscordMember member, params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
-                string teamName = rawTeamName.Trim();
+                string teamName = string.Join(" ", rawTeamNameParts).Trim();
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 Team team = new Team()
                 {
@@ -282,11 +286,11 @@ namespace QBDiscordAssistant.Discord
         // TODO: Refactor so that this shares the same code as addPlayer/removePlayer
         [Command("joinTeam")]
         [Description("Join a team.")]
-        public Task JoinTeam(CommandContext context, string rawTeamName)
+        public Task JoinTeam(CommandContext context, params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context))
             {
-                string teamName = rawTeamName.Trim();
+                string teamName = string.Join(" ", rawTeamNameParts).Trim();
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 Team team = new Team()
                 {
@@ -318,7 +322,7 @@ namespace QBDiscordAssistant.Discord
 
         [Command("leaveTeam")]
         [Description("Leave a team.")]
-        public Task LeaveTeam(CommandContext context, string rawTeamName)
+        public Task LeaveTeam(CommandContext context)
         {
             if (IsMainChannel(context))
             {
@@ -342,7 +346,7 @@ namespace QBDiscordAssistant.Discord
 
         [Command("roundRobins")]
         [Description("Sets the number of round robins to run.")]
-        public Task End(CommandContext context, int roundRobinsCount)
+        public Task RoundRobins(CommandContext context, int roundRobinsCount)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -355,8 +359,8 @@ namespace QBDiscordAssistant.Discord
         }
 
         [Command("start")]
-        [Description("Starts the tournament")]
-        public async Task Start(CommandContext context, int roundRobinsCount)
+        [Description("Starts the current tournament")]
+        public async Task Start(CommandContext context)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -371,15 +375,16 @@ namespace QBDiscordAssistant.Discord
                 await CreateChannels(context, manager.CurrentTournament);
 
                 manager.CurrentTournament.Stage = TournamentStage.Running;
-                await context.Channel.SendMessageAsync("Starting the tournament...");
+                await context.Channel.SendMessageAsync(
+                    $"{context.Channel.Mention}: tournament has started. Go to your first round room and follow the instructions.");
             }
 
             return;
         }
 
         [Command("end")]
-        [Description("Ends the tournament.")]
-        public async Task End(CommandContext context, string rawTeamName)
+        [Description("Ends the current tournament.")]
+        public async Task End(CommandContext context)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -433,54 +438,75 @@ namespace QBDiscordAssistant.Discord
                 Permissions.MuteMembers);
 
             // Create the voice channels
-            List<Task> createChannelsTasks = new List<Task>();
+            List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
             ////List<Task> deleteExistingChannelsTasks = new List<Task>();
             foreach (Reader reader in state.Readers)
             {
                 // TODO: See what happens if we try to create an existing channel. If it's bad, then delete channels
                 // whose names overlap.
-                createChannelsTasks.Add(CreateVoiceChannel(context, reader, readerRole));
+                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, reader, readerRole));
             }
 
+            // We will need the voice channels to get the mentions for it that we post when the user joins the
+            // text channel.
+            IDictionary<string, DiscordChannel> voiceChannels = (await Task.WhenAll(createVoiceChannelsTasks))
+                .ToDictionary(c => c.Name, c => c);
+
             // Create the text channels
+            List<Task> createTextChannelsTasks = new List<Task>();
             int roundNumber = 1;
             foreach (Round round in state.Schedule.Rounds)
             {
                 foreach (Game game in round.Games)
                 {
-                    createChannelsTasks.Add(CreateTextChannel(context, state, game, roundNumber));
+                    createTextChannelsTasks.Add(CreateTextChannel(context, state, voiceChannels, game, roundNumber));
                 }
 
                 roundNumber++;
             }
 
-            await Task.WhenAll(createChannelsTasks);
+            await Task.WhenAll(createTextChannelsTasks);
             await context.Channel.SendMessageAsync("Tournament channels have been created.");
         }
 
-        private static async Task CreateVoiceChannel(CommandContext context, Reader reader, DiscordRole readerRole)
+        private static async Task<DiscordChannel> CreateVoiceChannel(
+            CommandContext context, Reader reader, DiscordRole readerRole)
         {
-            string name = $"{reader.Name}'s_Voice_Room";
+            string name = GetVoiceRoomName(reader);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice);
             DiscordMember readerMember = await context.Guild.GetMemberAsync(reader.Id);
             await context.Guild.GrantRoleAsync(readerMember, readerRole);
+            return channel;
         }
 
         private static async Task CreateTextChannel(
-            CommandContext context, TournamentState state, Game game, int roundNumber)
+            CommandContext context,
+            TournamentState state,
+            IDictionary<string, DiscordChannel> voiceChannels,
+            Game game,
+            int roundNumber)
         {
             // The room and role names will be the same.
             string name = GetTextRoomName(game.Reader, roundNumber);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Text);
             DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
             await channel.AddOverwriteAsync(context.Guild.EveryoneRole, Permissions.None, Permissions.None);
-            await channel.AddOverwriteAsync(
-                roomRole, Permissions.AccessChannels | Permissions.SendMessages, Permissions.None);
+
+            // They need to see the first message in the channel since the bot can't pin them. Since these are new
+            // channels, this shouldn't matter.
+            Permissions allowedPermissions =
+                Permissions.AccessChannels | Permissions.SendMessages | Permissions.ReadMessageHistory;
+            await channel.AddOverwriteAsync(roomRole, allowedPermissions, Permissions.None);
 
             // Grants the room role to the players, reader, and the admins.
             DiscordMember readerMember = await context.Guild.GetMemberAsync(game.Reader.Id);
             List<Task> grantRoomRole = new List<Task>();
             grantRoomRole.Add(context.Guild.GrantRoleAsync(readerMember, roomRole));
+
+            // Make sure the bot has visibility
+            DiscordMember botMember = await context.Guild.GetMemberAsync(context.Client.CurrentUser.Id);
+            await context.Guild.GrantRoleAsync(botMember, roomRole);
+
             IEnumerable<DiscordMember> admins = context.Guild.Members
                 .Where(member => member.Roles
                     .Any(role => role.CheckPermission(Permissions.Administrator) == PermissionLevel.Allowed));
@@ -498,6 +524,9 @@ namespace QBDiscordAssistant.Discord
             }
 
             await Task.WhenAll(grantRoomRole);
+
+            string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
+            await channel.SendMessageAsync($"Players: join this voice channel: {channelMention}");
         }
 
         // Removes channels and roles.
@@ -540,6 +569,11 @@ namespace QBDiscordAssistant.Discord
         private static string GetTextRoomName(Reader reader, int roundNumber)
         {
             return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_")}";
+        }
+
+        private static string GetVoiceRoomName(Reader reader)
+        {
+            return $"{reader.Name}'s_Voice_Room";
         }
 
         private static bool IsMainChannel(CommandContext context)
