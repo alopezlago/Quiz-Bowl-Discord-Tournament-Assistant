@@ -142,7 +142,8 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 manager.CurrentTournament.Readers.Add(new Reader()
                 {
-                    Id = member.Id
+                    Id = member.Id,
+                    Name = member.Nickname ?? member.DisplayName
                 });
                 return context.Channel.SendMessageAsync("Reader added.");
             }
@@ -159,6 +160,7 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 manager.CurrentTournament.Readers.Remove(new Reader()
                 {
+                    // We don't need the name to remove it.
                     Id = member.Id
                 });
                 return context.Channel.SendMessageAsync("Reader removed.");

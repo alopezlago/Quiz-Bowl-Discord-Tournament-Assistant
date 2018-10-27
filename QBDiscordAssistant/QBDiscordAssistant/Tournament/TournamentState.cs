@@ -19,6 +19,7 @@ namespace QBDiscordAssistant.Tournament
 
         public ulong GuildId { get; set; }
 
+        // TODO: Reconcile this with BotPermissions
         public Director[] Directors { get; set; }
 
         public TournamentStage Stage { get; set; }

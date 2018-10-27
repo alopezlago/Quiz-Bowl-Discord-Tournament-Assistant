@@ -12,9 +12,6 @@ namespace QBDiscordAssistant.Tournament
 
         public Reader Reader { get; set; }
 
-        // If we keep this separate from channels we can remove this.
-        public bool IsTextRoom { get; set; }
-
         public override bool Equals(object obj)
         {
             if (obj is Room otherRoom)
