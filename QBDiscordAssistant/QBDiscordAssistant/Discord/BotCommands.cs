@@ -390,6 +390,8 @@ namespace QBDiscordAssistant.Discord
                 IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(manager.CurrentTournament.RoundRobinsCount);
                 manager.CurrentTournament.Schedule = scheduleFactory.Generate(
                     manager.CurrentTournament.Teams, manager.CurrentTournament.Readers);
+
+                await context.Channel.SendMessageAsync("Creating the channels and roles...");
                 await CreateChannels(context, manager.CurrentTournament);
 
                 manager.CurrentTournament.Stage = TournamentStage.Running;
@@ -413,7 +415,6 @@ namespace QBDiscordAssistant.Discord
 
                     string tournamentName = manager.CurrentTournament.Name;
                     manager.CurrentTournament = null;
-                    await context.Channel.SendMessageAsync($"Tournament '{tournamentName}' has finished.");
                 }
             }
         }
@@ -542,7 +543,6 @@ namespace QBDiscordAssistant.Discord
             }
 
             await Task.WhenAll(createTextChannelsTasks);
-            await context.Channel.SendMessageAsync("Tournament channels have been created.");
         }
 
         private static async Task<DiscordChannel> CreateVoiceChannel(
@@ -654,7 +654,8 @@ namespace QBDiscordAssistant.Discord
 
             await Task.WhenAll(deleteChannelsTask);
             await Task.WhenAll(deleteRolesTask);
-            await context.Channel.SendMessageAsync("All tournament channels and roles removed.");
+            await context.Channel.SendMessageAsync(
+                $"All tournament channels and roles removed. Tournament '{state.Name}'is now finished.");
         }
 
         private static string GetTextRoomName(Reader reader, int roundNumber)
