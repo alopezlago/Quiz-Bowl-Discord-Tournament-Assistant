@@ -29,6 +29,9 @@ namespace QBDiscordAssistant.Tournament
 
         public ISet<Reader> Readers { get; private set; }
 
+        // This should influence Schedule... leaving it here for now, but maybe it should moved to Schedule
+        public int RoundRobinsCount { get; set; }
+
         // TODO: Make ISchedule?
         public Schedule Schedule { get; set; }
 

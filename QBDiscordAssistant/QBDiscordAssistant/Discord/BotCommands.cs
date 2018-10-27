@@ -334,6 +334,38 @@ namespace QBDiscordAssistant.Discord
             return Task.CompletedTask;
         }
 
+        [Command("roundRobins")]
+        [Description("Sets the number of round robins to run.")]
+        public Task End(CommandContext context, int roundRobinsCount)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                manager.CurrentTournament.RoundRobinsCount = roundRobinsCount;
+                return context.Channel.SendMessageAsync("Round robins set.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        [Command("start")]
+        [Description("Starts the tournament")]
+        public async Task Start(CommandContext context, int roundRobinsCount)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                manager.CurrentTournament.Stage = TournamentStage.BotSetup;
+                await context.Channel.SendMessageAsync("Initializing the schedule...");
+
+                // TODO: Add bot initialization logic, where we set up the schedule and the channels.
+
+                await context.Channel.SendMessageAsync("Starting the tournament...");
+            }
+
+            return;
+        }
+
         [Command("end")]
         [Description("Ends the tournament.")]
         public Task End(CommandContext context, string rawTeamName)
@@ -358,6 +390,7 @@ namespace QBDiscordAssistant.Discord
         // if Discord supports this.
         // Also, right now we force users to !leave/!remove and then !add/!join again. We should consider automatically
         // removing them so that we don't need to support both commands.
+        // We may want to guide TD through commands. So tell them after !addTeams, "now add users", after !roundrobins, "!start", etc.
         // 
         // Only in the main room:
         // !addTD @user <tournament name> [Admin]

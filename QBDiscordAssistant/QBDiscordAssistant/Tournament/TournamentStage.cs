@@ -5,7 +5,6 @@
         Created,
         RoleSetup,
         BotSetup,
-        Running,
-        Completed
+        Running
     }
 }
