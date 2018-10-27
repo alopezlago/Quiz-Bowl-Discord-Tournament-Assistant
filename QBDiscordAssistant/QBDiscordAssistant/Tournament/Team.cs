@@ -8,13 +8,11 @@ namespace QBDiscordAssistant.Tournament
     {
         public string Name { get; set; }
 
-        public ulong Id { get; set; }
-
         public override bool Equals(object obj)
         {
             if (obj is Team otherTeam)
             {
-                return this.Id == otherTeam.Id;
+                return this.Name == otherTeam.Name;
             }
 
             return false;
@@ -22,7 +20,7 @@ namespace QBDiscordAssistant.Tournament
 
         public override int GetHashCode()
         {
-            return this.Id.GetHashCode();
+            return this.Name.GetHashCode();
         }
     }
 }

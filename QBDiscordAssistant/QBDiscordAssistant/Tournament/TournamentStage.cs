@@ -2,7 +2,6 @@
 {
     public enum TournamentStage
     {
-        Nonexistent,
         Created,
         RoleSetup,
         BotSetup,

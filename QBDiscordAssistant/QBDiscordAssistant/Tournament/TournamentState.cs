@@ -9,9 +9,9 @@ namespace QBDiscordAssistant.Tournament
         public TournamentState()
         {
             this.Directors = new Director[0];
-            this.Players = new List<Player>();
-            this.Teams = new List<Team>();
-            this.Readers = new List<Reader>();
+            this.Players = new HashSet<Player>();
+            this.Teams = new HashSet<Team>();
+            this.Readers = new HashSet<Reader>();
         }
 
         // Name acts as an ID
@@ -23,11 +23,11 @@ namespace QBDiscordAssistant.Tournament
 
         public TournamentStage Stage { get; set; }
 
-        public IList<Player> Players { get; private set; }
+        public ISet<Player> Players { get; private set; }
 
-        public IList<Team> Teams { get; private set; }
+        public ISet<Team> Teams { get; private set; }
 
-        public IList<Reader> Readers { get; private set; }
+        public ISet<Reader> Readers { get; private set; }
 
         // TODO: Make ISchedule?
         public Schedule Schedule { get; set; }

@@ -1,5 +1,6 @@
 ﻿using DSharpPlus;
 using DSharpPlus.CommandsNext;
+using QBDiscordAssistant.Tournament;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -33,6 +34,24 @@ namespace QBDiscordAssistant.Discord
 
             DependencyCollectionBuilder dependencyCollectionBuilder = new DependencyCollectionBuilder();
             dependencyCollectionBuilder.AddInstance(configuration);
+
+            BotPermissions permissions = new BotPermissions();
+            foreach (string adminIdText in configuration.AdminIds)
+            {
+                if (ulong.TryParse(adminIdText, out ulong adminId))
+                {
+                    permissions.AdminIds.Add(adminId);
+                }
+                else
+                {
+                    Console.Error.WriteLine($"Could not convert adminId '{adminIdText}' to an ID.");
+                }
+            }
+            dependencyCollectionBuilder.AddInstance(permissions);
+
+            TournamentsManager manager = new TournamentsManager();
+            dependencyCollectionBuilder.AddInstance(manager);
+
             this.commandsModule = this.discordClient.UseCommandsNext(new CommandsNextConfiguration()
             {
                 StringPrefix = "!",

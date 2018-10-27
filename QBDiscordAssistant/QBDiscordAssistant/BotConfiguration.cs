@@ -5,5 +5,7 @@
         public string[] AdminIds { get; set; }
 
         public string BotToken { get; set; }
+
+        public string MainChannelName { get; set; }
     }
 }
