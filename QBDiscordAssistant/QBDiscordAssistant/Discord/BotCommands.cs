@@ -134,8 +134,15 @@ namespace QBDiscordAssistant.Discord
                     manager.CurrentTournament = state;
                     manager.PendingTournaments.Remove(tournamentName);
                     state.Stage = TournamentStage.RoleSetup;
-                    return context.Channel.SendMessageAsync(
-                        $"Begin setup phase for '{tournamentName}'. Add readers with !addreaders @user, add teams with !addteams <team>, and set the number of round robins with !roundrobins <# of round robins>. Once all players have joined with !joinTeam <team>, begin the tournament with !start.");
+                    StringBuilder builder = new StringBuilder();
+                    builder.AppendLine($"Begin setup phase for '{tournamentName}'");
+                    builder.AppendLine("Add readers with !addreaders *@user*");
+                    builder.AppendLine("Add teams with !addteams *team*");
+                    builder.AppendLine("Set the number of round robins with !roundrobins *# of round robins*");
+                    builder.AppendLine("Players can join their team with !jointeam *team*");
+                    builder.AppendLine("Once everything is set up, the director beings the tournament with !start");
+
+                    return context.Channel.SendMessageAsync(builder.ToString());
                 }
             }
 
