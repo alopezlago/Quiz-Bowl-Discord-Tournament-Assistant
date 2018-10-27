@@ -5,6 +5,7 @@ using DSharpPlus.Entities;
 using QBDiscordAssistant.Tournament;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.Discord
@@ -19,6 +20,8 @@ namespace QBDiscordAssistant.Discord
         }
 
         // TODO: Move all of the implementation to the BotCommandHandler methods so that they can be unit tested.
+        // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
+        // that they're not going to be looking at their DMs.
 
         // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
@@ -365,6 +368,12 @@ namespace QBDiscordAssistant.Discord
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (!(await IsTournamentReady(context, manager.CurrentTournament)))
+                {
+                    // IsTournamentReady handles the messaging since it knows what is invalid.
+                    return;
+                }
+
                 manager.CurrentTournament.Stage = TournamentStage.BotSetup;
                 await context.Channel.SendMessageAsync("Initializing the schedule...");
 
@@ -426,6 +435,37 @@ namespace QBDiscordAssistant.Discord
         //
         // !win <team name> [reader] (Optional, do this only if we have time)
 
+        private static async Task<bool> IsTournamentReady(CommandContext context, TournamentState state)
+        {
+            // TODO: Consider using a DiscordEmbed for this to make it look nicer.
+            StringBuilder failures = new StringBuilder();
+            if (state.Readers.Count == 0)
+            {
+                failures.AppendLine("- No readers assigned. Add readers with !addreader *@user mention*");
+            }
+
+            if (state.Teams.Count < 2)
+            {
+                failures.AppendLine(
+                    $"- Tournaments need 2 teams but only {state.Teams.Count} were created. Add teams with !addteam *team name*");
+            }
+
+            if (state.RoundRobinsCount <= 0)
+            {
+                failures.AppendLine("- The number of round robins to play is not set. Set it with !roundrobins *number*");
+            }
+
+            // TODO: Add player validation
+
+            if (failures.Length > 0)
+            {
+                await context.Channel.SendMessageAsync(failures.ToString());
+                return false;
+            }
+
+            return true;
+        }
+
         private static async Task CreateChannels(CommandContext context, TournamentState state)
         {
             // Create the reader role
@@ -435,7 +475,8 @@ namespace QBDiscordAssistant.Discord
                 Permissions.Speak |
                 Permissions.SendMessages |
                 Permissions.KickMembers |
-                Permissions.MuteMembers);
+                Permissions.MuteMembers |
+                Permissions.DeafenMembers);
 
             // Create the voice channels
             List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
@@ -490,7 +531,7 @@ namespace QBDiscordAssistant.Discord
             string name = GetTextRoomName(game.Reader, roundNumber);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Text);
             DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
-            await channel.AddOverwriteAsync(context.Guild.EveryoneRole, Permissions.None, Permissions.None);
+            await channel.AddOverwriteAsync(context.Guild.EveryoneRole, Permissions.None, Permissions.ReadMessageHistory | Permissions.AccessChannels);
 
             // They need to see the first message in the channel since the bot can't pin them. Since these are new
             // channels, this shouldn't matter.
