@@ -16,13 +16,13 @@
   
   <!-- Once we have need of these items, copy them-->
   <!-- The txt files aren't automatically copied to the bin folder-->
-  <!--<ItemGroup>
+  <ItemGroup>
     <None Include="discordToken.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="config.txt">
+    <!--<None Include="config.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>-->
+    </None>-->
+  </ItemGroup>
 
 </Project>

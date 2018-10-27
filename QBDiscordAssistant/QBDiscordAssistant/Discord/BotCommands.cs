@@ -20,13 +20,16 @@ namespace QBDiscordAssistant.Discord
 
         // TODO: Move all of the implementation to the BotCommandHandler methods so that they can be unit tested.
 
+        // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
         [Description("Adds a tournament director to a tournament, and creates that tournament if it doesn't exist yet.")]
-        public Task AddTournamentDirector(CommandContext context, DiscordMember newDirector, string rawTournamentName)
+        [RequireOwner]
+        [RequirePermissions(Permissions.Administrator)]
+        public Task AddTournamentDirector(CommandContext context, DiscordMember newDirector, params string[] rawTournamentNameArray)
         {
-            if (IsMainChannel(context) && IsAdminUser(context))
+            if (IsMainChannel(context))
             {
-                string tournamentName = rawTournamentName.Trim();
+                string tournamentName = string.Join(" ", rawTournamentNameArray).Trim();
                 BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
                 if (!permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors))
                 {
@@ -57,9 +60,11 @@ namespace QBDiscordAssistant.Discord
 
         [Command("removeTD")]
         [Description("Removes a tournament director from a tournament.")]
+        [RequireOwner]
+        [RequirePermissions(Permissions.Administrator)]
         public Task RemoveTournamentDirector(CommandContext context, DiscordMember newDirector, string rawTournamentName)
         {
-            if (IsMainChannel(context) && IsAdminUser(context))
+            if (IsMainChannel(context))
             {
                 string tournamentName = rawTournamentName.Trim();
                 BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
@@ -543,11 +548,10 @@ namespace QBDiscordAssistant.Discord
             return context.Channel.Name == configuration.MainChannelName;
         }
 
-        // TODO: Look into using "RequiredRole" instead of this.
         private static bool IsAdminUser(CommandContext context)
         {
-            BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
-            return permissions.AdminIds.Contains(context.User.Id);
+            return context.Member.IsOwner ||
+                (context.Channel.PermissionsFor(context.Member) & Permissions.Administrator) == Permissions.Administrator;
         }
 
         private static bool HasTournamentDirectorPrivileges(CommandContext context)
