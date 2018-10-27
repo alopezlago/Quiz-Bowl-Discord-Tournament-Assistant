@@ -469,6 +469,8 @@ namespace QBDiscordAssistant.Discord
         private static async Task CreateChannels(CommandContext context, TournamentState state)
         {
             // Create the reader role
+            // 256 according to the Discord documentation
+            Permissions prioritySpeaker = (Permissions)256;
             DiscordRole readerRole = await context.Guild.CreateRoleAsync("Reader", color: DiscordColor.Orange, permissions:
                 Permissions.UseVoiceDetection |
                 Permissions.UseVoice |
@@ -476,7 +478,8 @@ namespace QBDiscordAssistant.Discord
                 Permissions.SendMessages |
                 Permissions.KickMembers |
                 Permissions.MuteMembers |
-                Permissions.DeafenMembers);
+                Permissions.DeafenMembers |
+                prioritySpeaker);
 
             // Create the voice channels
             List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
@@ -548,7 +551,9 @@ namespace QBDiscordAssistant.Discord
             DiscordMember botMember = await context.Guild.GetMemberAsync(context.Client.CurrentUser.Id);
             await context.Guild.GrantRoleAsync(botMember, roomRole);
 
-            IEnumerable<DiscordMember> admins = context.Guild.Members
+            IReadOnlyList<DiscordMember> members = context.Guild.Members;
+
+            IEnumerable<DiscordMember> admins = members
                 .Where(member => member.Roles
                     .Any(role => role.CheckPermission(Permissions.Administrator) == PermissionLevel.Allowed));
             foreach (DiscordMember admin in admins)
@@ -556,6 +561,16 @@ namespace QBDiscordAssistant.Discord
                 grantRoomRole.Add(context.Guild.GrantRoleAsync(admin, roomRole));
             }
 
+            IEnumerable<DiscordMember> directors = members.Where(member => state.Directors.Contains(new Director()
+            {
+                Id = member.Id
+            }));
+            foreach (DiscordMember director in directors)
+            {
+                grantRoomRole.Add(context.Guild.GrantRoleAsync(director, roomRole));
+            }
+
+            // TODO: Use members instead?
             IEnumerable<DiscordMember> playerMembers = await Task.WhenAll(state.Players
                 .Join(game.Teams, player => player.Team, team => team, (player, team) => player.Id)
                 .Select(id => context.Guild.GetMemberAsync(id)));
