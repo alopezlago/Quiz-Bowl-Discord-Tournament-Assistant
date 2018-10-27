@@ -11,7 +11,7 @@ namespace QBDiscordAssistant.Tournament
     {
         public TournamentsManager()
         {
-            this.PendingTournaments = new Dictionary<string, TournamentState>();
+            this.PendingTournaments = new Dictionary<string, TournamentState>(StringComparer.CurrentCultureIgnoreCase);
         }
 
         public ulong GuildId { get; set; }
