@@ -36,24 +36,21 @@ namespace QBDiscordAssistant.Discord
             if (IsMainChannel(context))
             {
                 string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-                BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
-                if (!permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors))
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (!manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state))
                 {
-                    directors = new HashSet<Director>();
-                    permissions.PossibleDirectors[tournamentName] = directors;
-                    TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-
-                    // TODO: Should we just store directors here instead of in BotPermissions?
-                    manager.PendingTournaments[tournamentName] = new TournamentState()
+                    state = new TournamentState()
                     {
-                        Directors = directors,
                         GuildId = context.Guild.Id,
                         Name = tournamentName,
                         Stage = TournamentStage.Created
                     };
+
+                    // TODO: Should we just store directors here instead of in BotPermissions?
+                    manager.PendingTournaments[tournamentName] = state;
                 }
 
-                directors.Add(new Director()
+                state.Directors.Add(new Director()
                 {
                     Id = newDirector.Id
                 });
@@ -74,16 +71,18 @@ namespace QBDiscordAssistant.Discord
             if (IsMainChannel(context))
             {
                 string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-                BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
-                if (permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors))
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state))
                 {
-                    permissions.PossibleDirectors[tournamentName].Remove(new Director()
+                    state.Directors.Remove(new Director()
                     {
                         Id = newDirector.Id
                     });
-                }
 
-                return context.Channel.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
+                    // TODO: Make this based on the result of Remove
+                    return context.Channel.SendMessageAsync(
+                        $"Removed tournament director from tournament '{tournamentName}'.");
+                }
             }
 
             return Task.CompletedTask;
@@ -120,17 +119,14 @@ namespace QBDiscordAssistant.Discord
 
             // We really need to refactor BotPermissions so that we use only the ID.
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
-            BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
-            if (IsAdminUser(context) ||
-                (permissions.PossibleDirectors.TryGetValue(tournamentName, out ISet<Director> directors) &&
-                directors.Contains(new Director()
+            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state) &&
+                (IsAdminUser(context) || state.Directors.Contains(new Director()
                 {
                     Id = context.User.Id
                 })))
             {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                if (manager.CurrentTournament == null &&
-                    manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state))
+                if (manager.CurrentTournament == null)
                 {
                     // Once we enter setup we should remove the current tournament from pending
                     manager.CurrentTournament = state;
@@ -138,9 +134,9 @@ namespace QBDiscordAssistant.Discord
                     state.Stage = TournamentStage.RoleSetup;
                     StringBuilder builder = new StringBuilder();
                     builder.AppendLine($"Begin setup phase for '{tournamentName}'");
-                    builder.AppendLine("Add readers with !addreaders *@user*");
-                    builder.AppendLine("Add teams with !addteams *team*");
-                    builder.AppendLine("Set the number of round robins with !roundrobins *# of round robins*");
+                    builder.AppendLine("Add readers with !addReader *@user*");
+                    builder.AppendLine("Add teams with !addTeam *team*");
+                    builder.AppendLine("Set the number of round robins with !setRoundRobins *# of round robins*");
                     builder.AppendLine("Players can join their team with !jointeam *team*");
                     builder.AppendLine("Once everything is set up, the director beings the tournament with !start");
 
@@ -356,9 +352,9 @@ namespace QBDiscordAssistant.Discord
             return Task.CompletedTask;
         }
 
-        [Command("roundRobins")]
+        [Command("setRoundRobins")]
         [Description("Sets the number of round robins to run.")]
-        public Task RoundRobins(CommandContext context, int roundRobinsCount)
+        public Task SetRoundRobins(CommandContext context, int roundRobinsCount)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -472,18 +468,18 @@ namespace QBDiscordAssistant.Discord
             StringBuilder failures = new StringBuilder();
             if (state.Readers.Count == 0)
             {
-                failures.AppendLine("- No readers assigned. Add readers with !addreader *@user mention*");
+                failures.AppendLine("- No readers assigned. Add readers with !addReader *@user mention*");
             }
 
             if (state.Teams.Count < 2)
             {
                 failures.AppendLine(
-                    $"- Tournaments need 2 teams but only {state.Teams.Count} were created. Add teams with !addteam *team name*");
+                    $"- Tournaments need 2 teams but only {state.Teams.Count} were created. Add teams with !addTeam *team name*");
             }
 
             if (state.RoundRobinsCount <= 0)
             {
-                failures.AppendLine("- The number of round robins to play is not set. Set it with !roundrobins *number*");
+                failures.AppendLine("- The number of round robins to play is not set. Set it with !setRoundRobins *number*");
             }
 
             // TODO: Add player validation
@@ -655,7 +651,7 @@ namespace QBDiscordAssistant.Discord
             await Task.WhenAll(deleteChannelsTask);
             await Task.WhenAll(deleteRolesTask);
             await context.Channel.SendMessageAsync(
-                $"All tournament channels and roles removed. Tournament '{state.Name}'is now finished.");
+                $"All tournament channels and roles removed. Tournament '{state.Name}' is now finished.");
         }
 
         private static string GetTextRoomName(Reader reader, int roundNumber)
@@ -665,7 +661,7 @@ namespace QBDiscordAssistant.Discord
 
         private static string GetVoiceRoomName(Reader reader)
         {
-            return $"{reader.Name}'s_Voice_Room";
+            return $"{reader.Name.Replace(" ", "_")}'s_Voice_Room";
         }
 
         private static bool IsMainChannel(CommandContext context)
@@ -687,19 +683,12 @@ namespace QBDiscordAssistant.Discord
                 return true;
             }
 
-            BotPermissions permissions = context.Dependencies.GetDependency<BotPermissions>();
+            // TD is only allowed to run commands when they are a director of the current tournament.
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-            if (manager.CurrentTournament == null)
+            return manager.CurrentTournament != null && manager.CurrentTournament.Directors.Contains(new Director()
             {
-                // No tournament is running.
-                return false;
-            }
-
-            return permissions.PossibleDirectors.TryGetValue(manager.CurrentTournament.Name, out ISet<Director> directors) &&
-                directors.Contains(new Director()
-                {
-                    Id = context.User.Id
-                });
+                Id = context.User.Id
+            });
         }
     }
 }

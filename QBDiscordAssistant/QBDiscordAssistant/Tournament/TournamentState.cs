@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Globalization;
 
 namespace QBDiscordAssistant.Tournament
 {
@@ -19,9 +19,8 @@ namespace QBDiscordAssistant.Tournament
 
         public ulong GuildId { get; set; }
 
-        // TODO: Reconcile this with BotPermissions
-        // TODO: Consider making this Ids
-        public ISet<Director> Directors { get; set; }
+        // TODO: Consider making this Ids, since Director is not very useful
+        public ISet<Director> Directors { get; private set; }
 
         public TournamentStage Stage { get; set; }
 
@@ -41,7 +40,7 @@ namespace QBDiscordAssistant.Tournament
         {
             if (obj is TournamentState otherReader)
             {
-                return this.Name == otherReader.Name;
+                return this.Name.Equals(otherReader.Name, StringComparison.CurrentCultureIgnoreCase);
             }
 
             return false;
@@ -49,7 +48,7 @@ namespace QBDiscordAssistant.Tournament
 
         public override int GetHashCode()
         {
-            return this.Name.GetHashCode();
+            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode();
         }
     }
 }

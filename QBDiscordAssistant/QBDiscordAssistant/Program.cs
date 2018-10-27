@@ -49,7 +49,6 @@ namespace QBDiscordAssistant
             {
                 return new BotConfiguration()
                 {
-                    AdminIds = new string[0],
                     BotToken = botToken,
                     MainChannelName = "general"
                 };
