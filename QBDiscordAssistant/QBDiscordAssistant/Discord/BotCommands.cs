@@ -420,14 +420,14 @@ namespace QBDiscordAssistant.Discord
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                manager.CurrentTournament.Teams.Add(new Team()
+                for (int i = 0; i < 4; i++)
                 {
-                    Name = "Team1"
-                });
-                manager.CurrentTournament.Teams.Add(new Team()
-                {
-                    Name = "Team2"
-                });
+                    manager.CurrentTournament.Teams.Add(new Team()
+                    {
+                        Name = $"Team{i}"
+                    });
+                }
+
                 manager.CurrentTournament.RoundRobinsCount = 2;
             }
 
