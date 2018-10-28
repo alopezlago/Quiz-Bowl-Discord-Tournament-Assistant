@@ -611,8 +611,15 @@ namespace QBDiscordAssistant.Discord
 
             // Because we're creating so many channels, this will get throttled, whether we await or not.
             // TODO: Investigate sending this after a short, random sleep.
-            string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
-            await channel.SendMessageAsync($"Players: join this voice channel when your moderator tells you to: {channelMention}");
+            // This may be risky, because it could block the thread... but maybe worth a try? If it works, move Random
+            // to a static. But it didn't seem to help.
+            ////Random random = new Random();
+            ////int delay = random.Next(0, 1000);
+            ////await Task.Delay(delay);
+
+            // TODO: When we figure out how to avoid the throttling (and make it trickle in), bring back the message.
+            ////string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
+            ////await channel.SendMessageAsync($"Players: join this voice channel when your moderator tells you to: {channelMention}");
         }
 
         // Removes channels and roles.
