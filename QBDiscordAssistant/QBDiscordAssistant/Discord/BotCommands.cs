@@ -23,7 +23,6 @@ namespace QBDiscordAssistant.Discord
         // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
         // that they're not going to be looking at their DMs.
         // TODO: Look into abstracting away some of the "get members of X". Should simplify the permissions setting.
-        // TODO: Directors still aren't able to see channels.
 
         // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
@@ -123,7 +122,7 @@ namespace QBDiscordAssistant.Discord
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state) &&
-                (IsAdminUser(context) || state.DirectorIds.Contains(context.User.Id)) &&
+                (IsAdminUser(context, context.Member) || state.DirectorIds.Contains(context.User.Id)) &&
                 manager.CurrentTournament == null)
             {
                 // Once we enter setup we should remove the current tournament from pending
@@ -582,29 +581,30 @@ namespace QBDiscordAssistant.Discord
             DiscordMember botMember = await context.Guild.GetMemberAsync(context.Client.CurrentUser.Id);
             await context.Guild.GrantRoleAsync(botMember, roomRole);
 
-            IReadOnlyList<DiscordMember> members = context.Guild.Members;
-
-            IEnumerable<DiscordMember> admins = members
-                .Where(member => member.Roles
-                    .Any(role => role.CheckPermission(Permissions.Administrator) == PermissionLevel.Allowed));
+            IDictionary<ulong, DiscordMember> members = (await context.Guild.GetAllMembersAsync())
+                .ToDictionary(member => member.Id, member => member);
+            IEnumerable<DiscordMember> admins = members.Values.Where(member => IsAdminUser(context, member));
             foreach (DiscordMember admin in admins)
             {
                 grantRoomRole.Add(context.Guild.GrantRoleAsync(admin, roomRole));
             }
 
-            IEnumerable<DiscordMember> directors = members.Where(member => state.DirectorIds.Contains(member.Id));
-            foreach (DiscordMember director in directors)
+            foreach (ulong id in state.DirectorIds)
             {
-                grantRoomRole.Add(context.Guild.GrantRoleAsync(director, roomRole));
+                if (members.TryGetValue(id, out DiscordMember director))
+                {
+                    grantRoomRole.Add(context.Guild.GrantRoleAsync(director, roomRole));
+                }
             }
 
-            // TODO: Use members instead?
-            IEnumerable<DiscordMember> playerMembers = await Task.WhenAll(state.Players
-                .Join(game.Teams, player => player.Team, team => team, (player, team) => player.Id)
-                .Select(id => context.Guild.GetMemberAsync(id)));
-            foreach (DiscordMember playerMember in playerMembers)
+            IEnumerable<ulong> playerIds = state.Players
+                .Join(game.Teams, player => player.Team, team => team, (player, team) => player.Id);
+            foreach (ulong id in playerIds)
             {
-                grantRoomRole.Add(context.Guild.GrantRoleAsync(playerMember, roomRole));
+                if (members.TryGetValue(id, out DiscordMember player))
+                {
+                    grantRoomRole.Add(context.Guild.GrantRoleAsync(player, roomRole));
+                }
             }
 
             await Task.WhenAll(grantRoomRole);
@@ -671,15 +671,15 @@ namespace QBDiscordAssistant.Discord
             return context.Channel.Name == configuration.MainChannelName;
         }
 
-        private static bool IsAdminUser(CommandContext context)
+        private static bool IsAdminUser(CommandContext context, DiscordMember member)
         {
-            return context.Member.IsOwner ||
-                (context.Channel.PermissionsFor(context.Member) & Permissions.Administrator) == Permissions.Administrator;
+            return member.IsOwner ||
+                (context.Channel.PermissionsFor(member) & Permissions.Administrator) == Permissions.Administrator;
         }
 
         private static bool HasTournamentDirectorPrivileges(CommandContext context)
         {
-            if (IsAdminUser(context))
+            if (IsAdminUser(context, context.Member))
             {
                 return true;
             }
