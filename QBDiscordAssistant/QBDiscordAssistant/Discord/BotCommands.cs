@@ -415,12 +415,12 @@ namespace QBDiscordAssistant.Discord
 
         [Command("quick")]
         [Description("Delete. Adds default teams and round robins. Still needs assigned reader and added players.")]
-        public Task Quick(CommandContext context)
+        public Task Quick(CommandContext context, int teamCount)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < teamCount; i++)
                 {
                     manager.CurrentTournament.Teams.Add(new Team()
                     {
