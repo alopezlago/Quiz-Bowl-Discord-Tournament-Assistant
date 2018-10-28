@@ -386,7 +386,7 @@ namespace QBDiscordAssistant.Discord
                     manager.CurrentTournament.Teams, manager.CurrentTournament.Readers);
 
                 await context.Channel.SendMessageAsync("Creating the channels and roles...");
-                await CreateChannels(context, manager.CurrentTournament);
+                await CreateArtifacts(context, manager.CurrentTournament);
 
                 manager.CurrentTournament.Stage = TournamentStage.Running;
                 await context.Channel.SendMessageAsync(
@@ -491,7 +491,7 @@ namespace QBDiscordAssistant.Discord
             return true;
         }
 
-        private static async Task CreateChannels(CommandContext context, TournamentState state)
+        private static async Task CreateArtifacts(CommandContext context, TournamentState state)
         {
             // Create the reader role
             // 256 according to the Discord documentation
