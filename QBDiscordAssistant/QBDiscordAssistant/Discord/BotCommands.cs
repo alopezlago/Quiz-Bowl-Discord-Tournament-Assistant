@@ -46,16 +46,17 @@ namespace QBDiscordAssistant.Discord
                         Stage = TournamentStage.Created
                     };
 
-                    // TODO: Should we just store directors here instead of in BotPermissions?
                     manager.PendingTournaments[tournamentName] = state;
                 }
 
-                state.Directors.Add(new Director()
+                if (state.DirectorIds.Add(newDirector.Id))
                 {
-                    Id = newDirector.Id
-                });
-
-                return context.Channel.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
+                    return context.Channel.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
+                }
+                else
+                {
+                    return context.Channel.SendMessageAsync($"User is already a director of '{tournamentName}'.");
+                }
             }
 
             return Task.CompletedTask;
@@ -74,14 +75,16 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state))
                 {
-                    state.Directors.Remove(new Director()
+                    if (state.DirectorIds.Remove(newDirector.Id))
                     {
-                        Id = newDirector.Id
-                    });
-
-                    // TODO: Make this based on the result of Remove
-                    return context.Channel.SendMessageAsync(
-                        $"Removed tournament director from tournament '{tournamentName}'.");
+                        return context.Channel.SendMessageAsync(
+                            $"Removed tournament director from tournament '{tournamentName}'.");
+                    }
+                    else
+                    {
+                        return context.Channel.SendMessageAsync(
+                            "User is not a director for tournament '{tournamentName}'.");
+                    }
                 }
             }
 
@@ -117,31 +120,26 @@ namespace QBDiscordAssistant.Discord
                 return Task.CompletedTask;
             }
 
-            // We really need to refactor BotPermissions so that we use only the ID.
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state) &&
-                (IsAdminUser(context) || state.Directors.Contains(new Director()
-                {
-                    Id = context.User.Id
-                })))
+                (IsAdminUser(context) || state.DirectorIds.Contains(context.User.Id)) &&
+                manager.CurrentTournament == null)
             {
-                if (manager.CurrentTournament == null)
-                {
-                    // Once we enter setup we should remove the current tournament from pending
-                    manager.CurrentTournament = state;
-                    manager.PendingTournaments.Remove(tournamentName);
-                    state.Stage = TournamentStage.RoleSetup;
-                    StringBuilder builder = new StringBuilder();
-                    builder.AppendLine($"Begin setup phase for '{tournamentName}'");
-                    builder.AppendLine("Add readers with !addReader *@user*");
-                    builder.AppendLine("Add teams with !addTeam *team*");
-                    builder.AppendLine("Set the number of round robins with !setRoundRobins *# of round robins*");
-                    builder.AppendLine("Players can join their team with !jointeam *team*");
-                    builder.AppendLine("Once everything is set up, the director beings the tournament with !start");
+                // Once we enter setup we should remove the current tournament from pending
+                // TODO: Consider moving this message to a constant.
+                manager.CurrentTournament = state;
+                manager.PendingTournaments.Remove(tournamentName);
+                state.Stage = TournamentStage.RoleSetup;
+                StringBuilder builder = new StringBuilder();
+                builder.AppendLine($"Begin setup phase for '{tournamentName}'");
+                builder.AppendLine("Add readers with !addReader *@user*");
+                builder.AppendLine("Add teams with !addTeam *team*");
+                builder.AppendLine("Set the number of round robins with !setRoundRobins *# of round robins*");
+                builder.AppendLine("Players can join their team with !jointeam *team*");
+                builder.AppendLine("Once everything is set up, the director beings the tournament with !start");
 
-                    return context.Channel.SendMessageAsync(builder.ToString());
-                }
+                return context.Channel.SendMessageAsync(builder.ToString());
             }
 
             return Task.CompletedTask;
@@ -460,7 +458,7 @@ namespace QBDiscordAssistant.Discord
         // !start [TD]
         // !end [TD, Admin]
         //
-        // !win <team name> [reader] (Optional, do this only if we have time)
+        // !win <team name> [reader] (TODO later, do this only if we have time.)
 
         private static async Task<bool> IsTournamentReady(CommandContext context, TournamentState state)
         {
@@ -590,10 +588,7 @@ namespace QBDiscordAssistant.Discord
                 grantRoomRole.Add(context.Guild.GrantRoleAsync(admin, roomRole));
             }
 
-            IEnumerable<DiscordMember> directors = members.Where(member => state.Directors.Contains(new Director()
-            {
-                Id = member.Id
-            }));
+            IEnumerable<DiscordMember> directors = members.Where(member => state.DirectorIds.Contains(member.Id));
             foreach (DiscordMember director in directors)
             {
                 grantRoomRole.Add(context.Guild.GrantRoleAsync(director, roomRole));
@@ -685,10 +680,7 @@ namespace QBDiscordAssistant.Discord
 
             // TD is only allowed to run commands when they are a director of the current tournament.
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-            return manager.CurrentTournament != null && manager.CurrentTournament.Directors.Contains(new Director()
-            {
-                Id = context.User.Id
-            });
+            return manager.CurrentTournament != null && manager.CurrentTournament.DirectorIds.Contains(context.User.Id);
         }
     }
 }

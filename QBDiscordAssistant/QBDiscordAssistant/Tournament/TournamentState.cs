@@ -8,7 +8,7 @@ namespace QBDiscordAssistant.Tournament
     {
         public TournamentState()
         {
-            this.Directors = new HashSet<Director>();
+            this.DirectorIds = new HashSet<ulong>();
             this.Players = new HashSet<Player>();
             this.Teams = new HashSet<Team>();
             this.Readers = new HashSet<Reader>();
@@ -20,7 +20,7 @@ namespace QBDiscordAssistant.Tournament
         public ulong GuildId { get; set; }
 
         // TODO: Consider making this Ids, since Director is not very useful
-        public ISet<Director> Directors { get; private set; }
+        public ISet<ulong> DirectorIds { get; private set; }
 
         public TournamentStage Stage { get; set; }
 
