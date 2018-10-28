@@ -559,13 +559,17 @@ namespace QBDiscordAssistant.Discord
             // The room and role names will be the same.
             string name = GetTextRoomName(game.Reader, roundNumber);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Text);
-            DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
-            await channel.AddOverwriteAsync(context.Guild.EveryoneRole, Permissions.None, Permissions.ReadMessageHistory | Permissions.AccessChannels);
+            // Prevent people from seeing the text channel by default.
+            await channel.AddOverwriteAsync(
+                context.Guild.EveryoneRole, 
+                Permissions.None,
+                Permissions.ReadMessageHistory | Permissions.AccessChannels);
 
             // They need to see the first message in the channel since the bot can't pin them. Since these are new
             // channels, this shouldn't matter.
             Permissions allowedPermissions =
                 Permissions.AccessChannels | Permissions.SendMessages | Permissions.ReadMessageHistory;
+            DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
             await channel.AddOverwriteAsync(roomRole, allowedPermissions, Permissions.None);
 
             // TODO TODO: Reader doesn't seem to get permission to the text channels!
@@ -605,8 +609,10 @@ namespace QBDiscordAssistant.Discord
 
             await Task.WhenAll(grantRoomRole);
 
+            // Because we're creating so many channels, this will get throttled, whether we await or not.
+            // TODO: Investigate sending this after a short, random sleep.
             string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
-            await channel.SendMessageAsync($"Players: join this voice channel: {channelMention}");
+            await channel.SendMessageAsync($"Players: join this voice channel when your moderator tells you to: {channelMention}");
         }
 
         // Removes channels and roles.
