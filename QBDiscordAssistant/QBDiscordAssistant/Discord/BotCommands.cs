@@ -3,6 +3,7 @@ using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using QBDiscordAssistant.Tournament;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,7 @@ namespace QBDiscordAssistant.Discord
         // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
         // that they're not going to be looking at their DMs.
         // TODO: Look into abstracting away some of the "get members of X". Should simplify the permissions setting.
+        // TODO: Set permissions per team and per reader. Should reduce the number of roles we need to create.
 
         // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
@@ -32,7 +34,7 @@ namespace QBDiscordAssistant.Discord
         public Task AddTournamentDirector(
             CommandContext context, DiscordMember newDirector, params string[] tournamentNameParts)
         {
-            if (IsMainChannel(context))
+            if (IsMainChannel(context) && tournamentNameParts.Length > 0)
             {
                 string tournamentName = string.Join(" ", tournamentNameParts).Trim();
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
@@ -146,62 +148,67 @@ namespace QBDiscordAssistant.Discord
 
         [Command("addReader")]
         [Description("Add a reader.")]
-        public Task AddReader(CommandContext context, DiscordMember member)
+        public Task AddReader(
+            CommandContext context, 
+            [Description("Member to add as a reader.")] DiscordMember member)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                manager.CurrentTournament.Readers.Add(new Reader()
-                {
-                    Id = member.Id,
-                    Name = member.Nickname ?? member.DisplayName
-                });
-                return context.Channel.SendMessageAsync("Reader added.");
-            }
+            return this.AddReadersHelper(context, member);
+        }
 
-            return Task.CompletedTask;
+        [Command("addReaders")]
+        [Description("Adds multiple readers to the current tournament.")]
+        public Task AddReader(
+            CommandContext context,
+            [Description("List of members to add as readers to the current tournament.")] params DiscordMember[] members)
+        {
+            return this.AddReadersHelper(context, members);
         }
 
         [Command("removeReader")]
         [Description("Removes a reader.")]
-        public Task RemovesReader(CommandContext context, DiscordMember member)
+        public Task RemovesReader(
+            CommandContext context,
+            [Description("Member to remove as a reader.")] DiscordMember member)
+        {
+            return this.RemoveReadersHelper(context, member);
+        }
+
+        [Command("removeReaders")]
+        [Description("Removes readers from the current tournament.")]
+        public Task RemoveReaders(
+            CommandContext context,
+            [Description("List of members to remove as readers from the current tournament.")] params DiscordMember[] members)
+        {
+            return this.RemoveReadersHelper(context, members);
+        }
+
+        [Command("addTeam")]
+        [Description("Addsa team to the current tournament.")]
+        public Task AddTeam(
+            CommandContext context,
+            [Description("Team name")] params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                manager.CurrentTournament.Readers.Remove(new Reader()
+                // Escape the arguments
+                for (int i = 0; i < rawTeamNameParts.Length; i++)
                 {
-                    // We don't need the name to remove it.
-                    Id = member.Id
-                });
-                return context.Channel.SendMessageAsync("Reader removed.");
+                    rawTeamNameParts[i] = rawTeamNameParts[i].Replace(",,", ",");
+                }
+
+                return this.AddTeams(context, rawTeamNameParts);
             }
 
             return Task.CompletedTask;
         }
 
-        [Command("addTeam")]
-        [Description("Add a team.")]
-        public Task AddTeam(CommandContext context, params string[] rawTeamNameParts)
+        [Command("addTeams")]
+        [Description("Adds teams to the current tournament.")]
+        public Task AddTeams(
+            CommandContext context,
+            [Description("Team names, separated by commas. If the team name has a comma, use two commas to escape it.")] params string[] rawTeamNameParts)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                string teamName = string.Join(" ", rawTeamNameParts).Trim();
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                if (manager.CurrentTournament.Teams.Add(new Team()
-                {
-                    Name = teamName
-                }))
-                {
-                    return context.Channel.SendMessageAsync("Team added.");
-                }
-                else
-                {
-                    return context.Channel.SendMessageAsync("Team already exists.");
-                }
-            }
-
-            return Task.CompletedTask;
+            return this.AddTeamsHelper(context, rawTeamNameParts);
         }
 
         [Command("removeTeam")]
@@ -248,16 +255,16 @@ namespace QBDiscordAssistant.Discord
                         Team = team
                     }))
                     {
-                        return context.Channel.SendMessageAsync("Player added.");
+                        return context.Member.SendMessageAsync($"Player {member.Mention} added to team '{teamName}'.");
                     }
                     else
                     {
-                        return context.Channel.SendMessageAsync("Player is already on a team.");
+                        return context.Member.SendMessageAsync($"Player {member.Mention} is already on a team.");
                     }
                 }
                 else
                 {
-                    return context.Channel.SendMessageAsync("Team does not exist.");
+                    return context.Member.SendMessageAsync($"Team '{teamName}' does not exist.");
                 }
             }
 
@@ -277,11 +284,11 @@ namespace QBDiscordAssistant.Discord
                 };
                 if (manager.CurrentTournament.Players.Remove(player))
                 {
-                    return context.Channel.SendMessageAsync("Player removed.");
+                    return context.Member.SendMessageAsync($"Player {member.Mention} removed.");
                 }
                 else
                 {
-                    return context.Channel.SendMessageAsync("Player is not on any team.");
+                    return context.Member.SendMessageAsync($"Player {member.Mention} is not on any team.");
                 }
             }
 
@@ -357,7 +364,7 @@ namespace QBDiscordAssistant.Discord
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 manager.CurrentTournament.RoundRobinsCount = roundRobinsCount;
-                return context.Channel.SendMessageAsync("Round robins set.");
+                return context.Member.SendMessageAsync("Round robins set.");
             }
 
             return Task.CompletedTask;
@@ -450,9 +457,10 @@ namespace QBDiscordAssistant.Discord
         // !removeReader @user [TD]
         // !addTeam <team name> [TD]
         // !addPlayer @user <team name> [TD]
-        // !joinTeam <team name> [player]
         // !removePlayer @user [TD]
-        // !roundrobin <number> [TD] (should do single/double/triple round robin)
+        // !joinTeam <team name> [player]
+        // !leaveTeam <team name> [player]
+        // !setRoundRobins <number> [TD] (should do single/double/triple round robin)
         // !nofinal [TD] (TODO later, sets no final, when we move to advantaged final by default)
         // !start [TD]
         // !end [TD, Admin]
@@ -509,7 +517,6 @@ namespace QBDiscordAssistant.Discord
 
             // Create the voice channels
             List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
-            ////List<Task> deleteExistingChannelsTasks = new List<Task>();
             foreach (Reader reader in state.Readers)
             {
                 // TODO: See what happens if we try to create an existing channel. If it's bad, then delete channels
@@ -571,7 +578,6 @@ namespace QBDiscordAssistant.Discord
             DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
             await channel.AddOverwriteAsync(roomRole, allowedPermissions, Permissions.None);
 
-            // TODO TODO: Reader doesn't seem to get permission to the text channels!
             // Grants the room role to the players, reader, and the admins.
             DiscordMember readerMember = await context.Guild.GetMemberAsync(game.Reader.Id);
             List<Task> grantRoomRole = new List<Task>();
@@ -608,14 +614,6 @@ namespace QBDiscordAssistant.Discord
             }
 
             await Task.WhenAll(grantRoomRole);
-
-            // Because we're creating so many channels, this will get throttled, whether we await or not.
-            // TODO: Investigate sending this after a short, random sleep.
-            // This may be risky, because it could block the thread... but maybe worth a try? If it works, move Random
-            // to a static. But it didn't seem to help.
-            ////Random random = new Random();
-            ////int delay = random.Next(0, 1000);
-            ////await Task.Delay(delay);
 
             // TODO: When we figure out how to avoid the throttling (and make it trickle in), bring back the message.
             ////string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
@@ -694,6 +692,136 @@ namespace QBDiscordAssistant.Discord
             // TD is only allowed to run commands when they are a director of the current tournament.
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             return manager.CurrentTournament != null && manager.CurrentTournament.DirectorIds.Contains(context.User.Id);
+        }
+
+        private static bool TryGetTeamNamesFromParts(string[] rawTeamNameParts, out HashSet<string> teamNames, out string errorMessage)
+        {
+            errorMessage = null;
+            teamNames = new HashSet<string>();
+
+            if (rawTeamNameParts.Length == 0)
+            {
+                errorMessage = "no teams were specified in addTeams";
+                return false;
+            }
+
+            string combinedTeamNames = string.Join(" ", rawTeamNameParts).Trim();
+            bool possibleCommaEscapeStart = false;
+            int startIndex = 0;
+            int length;
+            string teamName;
+            for (int i = 0; i < combinedTeamNames.Length; i++)
+            {
+                char token = combinedTeamNames[i];
+                if (token == ',')
+                {
+                    // If the previous token was a comma, then this is an escape (i.e. this character won't be the
+                    // start of an escape). If not, then this could be the start of an escape.
+                    possibleCommaEscapeStart = !possibleCommaEscapeStart;
+                }
+                else if (possibleCommaEscapeStart)
+                {
+                    // The previous character was a comma, but this one isn't, so it's a separator. Get the team
+                    // name.
+                    length = Math.Max(0, i - startIndex - 1);
+                    teamName = combinedTeamNames
+                        .Substring(startIndex, length)
+                        .Trim()
+                        .Replace(",,", ",");
+                    teamNames.Add(teamName);
+                    startIndex = i;
+                    possibleCommaEscapeStart = false;
+                }
+            }
+
+            // Add the remaining team.
+            if (combinedTeamNames[combinedTeamNames.Length - 1] == ',' && possibleCommaEscapeStart)
+            {
+                errorMessage = "team missing from addTeams (trailing comma)";
+                return false;
+            }
+
+            // No comma, so don't subtract 1.
+            length = Math.Max(0, combinedTeamNames.Length - startIndex);
+            teamName = combinedTeamNames
+                .Substring(startIndex, length)
+                .Trim()
+                .Replace(",,", ",");
+            teamNames.Add(teamName);
+
+            return true;
+        }
+
+        private Task AddReadersHelper(CommandContext context, params DiscordMember[] members)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                foreach (DiscordMember member in members)
+                {
+                    manager.CurrentTournament.Readers.Add(new Reader()
+                    {
+                        Id = member.Id,
+                        Name = member.Nickname ?? member.DisplayName
+                    });
+                }
+
+                string readerWord = members.Length > 1 ? "Readers" : "Reader";
+                return context.Member.SendMessageAsync($"{readerWord} added.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private Task RemoveReadersHelper(CommandContext context, params DiscordMember[] members)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                foreach (DiscordMember member in members)
+                {
+                    manager.CurrentTournament.Readers.Remove(new Reader()
+                    {
+                        // We don't need the name to remove it.
+                        Id = member.Id
+                    });
+                }
+
+                string readerWord = members.Length > 1 ? "Readers" : "Reader";
+                return context.Member.SendMessageAsync($"{readerWord} removed.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private Task AddTeamsHelper(CommandContext context, params string[] rawTeamNameParts)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                if (!TryGetTeamNamesFromParts(rawTeamNameParts, out HashSet<string> teamNames, out string errorMessage))
+                {
+                    context.Member.SendMessageAsync($"Error: {errorMessage}.");
+                }
+
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                int count = 0;
+                foreach (string name in teamNames)
+                {
+                    if (manager.CurrentTournament.Teams.Add(new Team()
+                    {
+                        Name = name
+                    }))
+                    {
+                        count++;
+                    }
+                }
+
+                string teamWord = teamNames.Count > 1 ? "teams" : "team";
+                string duplicateTeamsMessage = count == teamNames.Count ? string.Empty : " (duplicate teams ignored)";
+                return context.Member.SendMessageAsync($"{count} team(s) added{duplicateTeamsMessage}.");
+            }
+
+            return Task.CompletedTask;
         }
     }
 }
