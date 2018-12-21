@@ -40,7 +40,9 @@ namespace QBDiscordAssistant.Discord
         [RequireOwner]
         [RequirePermissions(Permissions.Administrator)]
         public Task AddTournamentDirector(
-            CommandContext context, DiscordMember newDirector, params string[] tournamentNameParts)
+            CommandContext context,
+            [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
+            [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
             if (IsMainChannel(context) && tournamentNameParts.Length > 0)
             {
@@ -79,7 +81,9 @@ namespace QBDiscordAssistant.Discord
         [RequireOwner]
         [RequirePermissions(Permissions.Administrator)]
         public Task RemoveTournamentDirector(
-            CommandContext context, DiscordMember newDirector, params string[] tournamentNameParts)
+            CommandContext context,
+            [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
+            [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
             if (IsMainChannel(context))
             {
@@ -125,7 +129,9 @@ namespace QBDiscordAssistant.Discord
 
         [Command("setup")]
         [Description("Begins the setup phase of the tournament, where readers and teams can be added.")]
-        public Task Setup(CommandContext context, params string[] rawTournamentNameParts)
+        public Task Setup(
+            CommandContext context,
+            [Description("Name of the tournament.")] params string[] rawTournamentNameParts)
         {
             if (!IsMainChannel(context))
             {
@@ -164,7 +170,7 @@ namespace QBDiscordAssistant.Discord
         [Description("Add a reader.")]
         public Task AddReader(
             CommandContext context, 
-            [Description("Member to add as a reader.")] DiscordMember member)
+            [Description("Member to add as a reader (as a @mention).")] DiscordMember member)
         {
             return this.AddReadersHelper(context, member);
         }
@@ -173,7 +179,7 @@ namespace QBDiscordAssistant.Discord
         [Description("Adds multiple readers to the current tournament.")]
         public Task AddReader(
             CommandContext context,
-            [Description("List of members to add as readers to the current tournament.")] params DiscordMember[] members)
+            [Description("List of members to add as readers to the current tournament (as @mentions).")] params DiscordMember[] members)
         {
             return this.AddReadersHelper(context, members);
         }
@@ -182,7 +188,7 @@ namespace QBDiscordAssistant.Discord
         [Description("Removes a reader.")]
         public Task RemovesReader(
             CommandContext context,
-            [Description("Member to remove as a reader.")] DiscordMember member)
+            [Description("Member to remove as a reader (as a @mention).")] DiscordMember member)
         {
             return this.RemoveReadersHelper(context, member);
         }
@@ -191,7 +197,7 @@ namespace QBDiscordAssistant.Discord
         [Description("Removes readers from the current tournament.")]
         public Task RemoveReaders(
             CommandContext context,
-            [Description("List of members to remove as readers from the current tournament.")] params DiscordMember[] members)
+            [Description("List of members to remove as readers from the current tournament (as @mentions).")] params DiscordMember[] members)
         {
             return this.RemoveReadersHelper(context, members);
         }
@@ -227,7 +233,9 @@ namespace QBDiscordAssistant.Discord
 
         [Command("removeTeam")]
         [Description("Removes a team.")]
-        public Task RemoveTeam(CommandContext context, params string[] rawTeamNameParts)
+        public Task RemoveTeam(
+            CommandContext context,
+            [Description("Team name.")] params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -249,9 +257,16 @@ namespace QBDiscordAssistant.Discord
             return Task.CompletedTask;
         }
 
+        // TODO: Add removeTeams
+
+        // TODO: Add clear (reset players, teams, readers, round robins)
+
         [Command("addPlayer")]
         [Description("Adds a player to a team.")]
-        public Task AddPlayer(CommandContext context, DiscordMember member, params string[] rawTeamNameParts)
+        public Task AddPlayer(
+            CommandContext context,
+            [Description("Member to add as the player (as a @mention).")] DiscordMember member,
+            [Description("Team name.")] params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -287,7 +302,9 @@ namespace QBDiscordAssistant.Discord
 
         [Command("removePlayer")]
         [Description("Removes a player from a team.")]
-        public Task RemovePlayer(CommandContext context, DiscordMember member)
+        public Task RemovePlayer(
+            CommandContext context,
+            [Description("Member to add as the player (as a @mention).")] DiscordMember member)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -312,7 +329,9 @@ namespace QBDiscordAssistant.Discord
         // TODO: Refactor so that this shares the same code as addPlayer/removePlayer
         [Command("joinTeam")]
         [Description("Join a team.")]
-        public Task JoinTeam(CommandContext context, params string[] rawTeamNameParts)
+        public Task JoinTeam(
+            CommandContext context,
+            [Description("Team name.")] params string[] rawTeamNameParts)
         {
             if (IsMainChannel(context))
             {
@@ -372,7 +391,9 @@ namespace QBDiscordAssistant.Discord
 
         [Command("setRoundRobins")]
         [Description("Sets the number of round robins to run.")]
-        public Task SetRoundRobins(CommandContext context, int roundRobinsCount)
+        public Task SetRoundRobins(
+            CommandContext context,
+            [Description("Number of round robins to have.")] int roundRobinsCount)
         {
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
@@ -431,27 +452,6 @@ namespace QBDiscordAssistant.Discord
                     manager.CurrentTournament = null;
                 }
             }
-        }
-
-        [Command("quick")]
-        [Description("Delete. Adds default teams and round robins. Still needs assigned reader and added players.")]
-        public Task Quick(CommandContext context, int teamCount)
-        {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                for (int i = 0; i < teamCount; i++)
-                {
-                    manager.CurrentTournament.Teams.Add(new Team()
-                    {
-                        Name = $"Team{i}"
-                    });
-                }
-
-                manager.CurrentTournament.RoundRobinsCount = 2;
-            }
-
-            return Task.CompletedTask;
         }
 
         // Commands:
