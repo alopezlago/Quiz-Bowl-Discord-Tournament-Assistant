@@ -3,8 +3,9 @@
     public enum TournamentStage
     {
         Created,
-        RoleSetup,
+        PlayerSetup,
         BotSetup,
-        Running
+        Running,
+        Complete
     }
 }

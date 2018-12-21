@@ -13,12 +13,20 @@ namespace QBDiscordAssistant.Discord
 {
     public class BotCommands
     {
-        private readonly BotCommandHandler handler;
-
-        public BotCommands()
-        {
-            this.handler = new BotCommandHandler();
-        }
+        private const string DirectorRoleName = "Director";
+        private const string ReaderRoomRolePrefix = "Reader_Room_";
+        private const string TeamRolePrefix = "Team_";
+        private const Permissions PrioritySpeaker = (Permissions)256;
+        private const Permissions PrivilegedPermissions = Permissions.UseVoiceDetection |
+            Permissions.UseVoice |
+            Permissions.Speak |
+            Permissions.SendMessages |
+            Permissions.KickMembers |
+            Permissions.MuteMembers |
+            Permissions.DeafenMembers |
+            Permissions.ReadMessageHistory |
+            Permissions.AccessChannels |
+            PrioritySpeaker;
 
         // TODO: Move all of the implementation to the BotCommandHandler methods so that they can be unit tested.
         // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
@@ -49,6 +57,9 @@ namespace QBDiscordAssistant.Discord
 
                     manager.PendingTournaments[tournamentName] = state;
                 }
+
+                // TODO: Need to handle this differently depending on the stage. Completed shouldn't do anything, and
+                // after RoleSetup we should give them the TD role.
 
                 if (state.DirectorIds.Add(newDirector.Id))
                 {
@@ -121,6 +132,9 @@ namespace QBDiscordAssistant.Discord
                 return Task.CompletedTask;
             }
 
+            // TODO (Bug): Prevent the setup of two separate tournaments at the same time. This will require a new
+            // TournamentStage, and will require checking the tournament stage here.
+
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state) &&
@@ -131,7 +145,7 @@ namespace QBDiscordAssistant.Discord
                 // TODO: Consider moving this message to a constant.
                 manager.CurrentTournament = state;
                 manager.PendingTournaments.Remove(tournamentName);
-                state.Stage = TournamentStage.RoleSetup;
+                state.Stage = TournamentStage.PlayerSetup;
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine($"Begin setup phase for '{tournamentName}'");
                 builder.AppendLine("Add readers with !addReader *@user*");
@@ -411,7 +425,7 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament != null)
                 {
-                    await CleanupTournamentArtifcats(context, manager.CurrentTournament);
+                    await CleanupTournamentArtifacts(context, manager.CurrentTournament);
 
                     string tournamentName = manager.CurrentTournament.Name;
                     manager.CurrentTournament = null;
@@ -500,43 +514,44 @@ namespace QBDiscordAssistant.Discord
 
         private static async Task CreateArtifacts(CommandContext context, TournamentState state)
         {
-            // Create the reader role
-            // 256 according to the Discord documentation
-            Permissions prioritySpeaker = (Permissions)256;
-            DiscordRole readerRole = await context.Guild.CreateRoleAsync("Reader", color: DiscordColor.Orange, permissions:
-                Permissions.UseVoiceDetection |
-                Permissions.UseVoice |
-                Permissions.Speak |
-                Permissions.SendMessages |
-                Permissions.KickMembers |
-                Permissions.MuteMembers |
-                Permissions.DeafenMembers |
-                Permissions.ReadMessageHistory |
-                Permissions.AccessChannels |
-                prioritySpeaker);
-
-            // Create the voice channels
-            List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
-            foreach (Reader reader in state.Readers)
+            // GetAllMembersAsync may contain the same member multiple times, which causes ToDictionary to throw. Add
+            // members manually to a dictionary instead.
+            IReadOnlyList<DiscordMember> allMembers = await context.Guild.GetAllMembersAsync();
+            IDictionary<ulong, DiscordMember> members = new Dictionary<ulong, DiscordMember>();
+            foreach (DiscordMember member in allMembers)
             {
-                // TODO: See what happens if we try to create an existing channel. If it's bad, then delete channels
-                // whose names overlap.
-                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, reader, readerRole));
+                members[member.Id] = member;
             }
 
-            // We will need the voice channels to get the mentions for it that we post when the user joins the
-            // text channel.
-            IDictionary<string, DiscordChannel> voiceChannels = (await Task.WhenAll(createVoiceChannelsTasks))
-                .ToDictionary(c => c.Name, c => c);
+            DiscordRole directorRole = await AssignDirectorRole(context, state, members);
+            DiscordRole[] roomReaderRoles = await CreateRoomReaderRoles(context, state);
+            Dictionary<Team, DiscordRole> teamRoles = await AssignPlayerRoles(context, state, members);
+            TournamentRoles roles = new TournamentRoles()
+            {
+                DirectorRole = directorRole,
+                RoomReaderRoles = roomReaderRoles,
+                TeamRoles = teamRoles
+            };
+
+            // Create the voice channels
+            int roomsCount = state.Teams.Count / 2;
+            List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
+            for (int i = 0; i < roomsCount; i++)
+            {
+                // TODO: See if we have an existing channel with that name, and delete it.
+                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, roles, i));
+            }
+            await Task.WhenAll(createVoiceChannelsTasks);
 
             // Create the text channels
             List<Task> createTextChannelsTasks = new List<Task>();
             int roundNumber = 1;
             foreach (Round round in state.Schedule.Rounds)
             {
+                int roomNumber = 0;
                 foreach (Game game in round.Games)
                 {
-                    createTextChannelsTasks.Add(CreateTextChannel(context, state, voiceChannels, game, roundNumber));
+                    createTextChannelsTasks.Add(CreateTextChannel(context, game, roles, roundNumber, roomNumber));
                 }
 
                 roundNumber++;
@@ -545,22 +560,98 @@ namespace QBDiscordAssistant.Discord
             await Task.WhenAll(createTextChannelsTasks);
         }
 
-        private static async Task<DiscordChannel> CreateVoiceChannel(
-            CommandContext context, Reader reader, DiscordRole readerRole)
+        private static async Task<KeyValuePair<Team, DiscordRole>> CreateTeamRole(CommandContext context, Team team)
         {
-            string name = GetVoiceRoomName(reader);
+            DiscordRole role = await context.Guild.CreateRoleAsync(GetTeamRoleName(team), color: DiscordColor.Aquamarine);
+            return new KeyValuePair<Team, DiscordRole>(team, role);
+        }
+
+        private static async Task<DiscordChannel> CreateVoiceChannel(
+            CommandContext context, TournamentRoles roles, int roomIndex)
+        {
+            string name = GetVoiceRoomName(roomIndex);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice);
-            DiscordMember readerMember = await context.Guild.GetMemberAsync(reader.Id);
-            await context.Guild.GrantRoleAsync(readerMember, readerRole);
             return channel;
         }
 
-        private static async Task CreateTextChannel(
+        private static async Task<Dictionary<Team, DiscordRole>> AssignPlayerRoles(
+            CommandContext context, TournamentState state, IDictionary<ulong, DiscordMember> members)
+        {
+            List<Task<KeyValuePair<Team, DiscordRole>>> addTeamRoleTasks = new List<Task<KeyValuePair<Team, DiscordRole>>>();
+            foreach (Team team in state.Teams)
+            {
+                addTeamRoleTasks.Add(CreateTeamRole(context, team));
+            }
+
+            IEnumerable<KeyValuePair<Team, DiscordRole>> teamRolePairs = await Task.WhenAll(addTeamRoleTasks);
+            Dictionary<Team, DiscordRole> teamRoles = new Dictionary<Team, DiscordRole>(teamRolePairs);
+
+            List<Task> assignPlayerRoleTasks = new List<Task>();
+            foreach (Player player in state.Players)
+            {
+                if (!teamRoles.TryGetValue(player.Team, out DiscordRole role))
+                {
+                    Console.Error.WriteLine($"Player {player.Id} does not have a team role for team {player.Team}.");
+                    continue;
+                }
+
+                if (!members.TryGetValue(player.Id, out DiscordMember member))
+                {
+                    Console.Error.WriteLine($"Player {player.Id} does not have a DiscordMember.");
+                    continue;
+                }
+
+                assignPlayerRoleTasks.Add(context.Guild.GrantRoleAsync(member, role));
+            }
+
+            await Task.WhenAll(assignPlayerRoleTasks);
+            return teamRoles;
+        }
+
+        private static async Task<DiscordRole> AssignDirectorRole(
             CommandContext context,
             TournamentState state,
-            IDictionary<string, DiscordChannel> voiceChannels,
-            Game game,
-            int roundNumber)
+            IDictionary<ulong, DiscordMember> members)
+        {
+            DiscordRole role = await context.Guild.CreateRoleAsync(
+                DirectorRoleName, permissions: PrivilegedPermissions, color: DiscordColor.Gold);
+            Task[] assignRoleTasks = new Task[state.DirectorIds.Count];
+            int i = 0;
+            foreach (ulong directorId in state.DirectorIds)
+            {
+                if (members.TryGetValue(directorId, out DiscordMember member))
+                {
+                    assignRoleTasks[i] = context.Guild.GrantRoleAsync(member, role);
+                }
+                else
+                {
+                    Console.Error.WriteLine($"Could not find director with ID {directorId}");
+                }
+            }
+
+            await Task.WhenAll(assignRoleTasks);
+            return role;
+        }
+
+        private static Task<DiscordRole[]> CreateRoomReaderRoles(CommandContext context, TournamentState state)
+        {
+            int roomsCount = state.Teams.Count / 2;
+            Task<DiscordRole>[] roomReaderRoleTasks = new Task<DiscordRole>[roomsCount];
+
+            for (int i = 0; i < roomsCount; i++)
+            {
+                roomReaderRoleTasks[i] =
+                    context.Guild.CreateRoleAsync(
+                        GetRoomReaderRoleName(i), permissions: PrivilegedPermissions, color: DiscordColor.LightGray);
+            }
+
+            return Task.WhenAll(roomReaderRoleTasks);
+        }
+
+        // TODO: Pass in the parent channel (category channel)
+        // TODO: Pass in the Bot member
+        private static async Task CreateTextChannel(
+            CommandContext context, Game game, TournamentRoles roles, int roundNumber,  int roomNumber)
         {
             // The room and role names will be the same.
             string name = GetTextRoomName(game.Reader, roundNumber);
@@ -571,57 +662,40 @@ namespace QBDiscordAssistant.Discord
                 Permissions.None,
                 Permissions.ReadMessageHistory | Permissions.AccessChannels);
 
+            // TODO: Give the bot less-than-privileged permissions.
+            // TODO: Pass in the bot member to reduce lookups
+            DiscordMember botMember = await context.Guild.GetMemberAsync(context.Client.CurrentUser.Id);
+            await channel.AddOverwriteAsync(botMember, PrivilegedPermissions, Permissions.None);
+
+            await channel.AddOverwriteAsync(roles.DirectorRole, PrivilegedPermissions, Permissions.None);
+            await channel.AddOverwriteAsync(roles.RoomReaderRoles[roomNumber], PrivilegedPermissions, Permissions.None);
+
             // They need to see the first message in the channel since the bot can't pin them. Since these are new
             // channels, this shouldn't matter.
-            Permissions allowedPermissions =
+            // TODO: We should pass in a dictionary of team roles, and set the channel to accept those roles.
+            Permissions teamAllowedPermissions =
                 Permissions.AccessChannels | Permissions.SendMessages | Permissions.ReadMessageHistory;
-            DiscordRole roomRole = await context.Guild.CreateRoleAsync(name);
-            await channel.AddOverwriteAsync(roomRole, allowedPermissions, Permissions.None);
+            // Need to get teams, then add allowedPermissions to this team
 
-            // Grants the room role to the players, reader, and the admins.
-            DiscordMember readerMember = await context.Guild.GetMemberAsync(game.Reader.Id);
-            List<Task> grantRoomRole = new List<Task>();
-            grantRoomRole.Add(context.Guild.GrantRoleAsync(readerMember, roomRole));
-
-            // Make sure the bot has visibility
-            DiscordMember botMember = await context.Guild.GetMemberAsync(context.Client.CurrentUser.Id);
-            await context.Guild.GrantRoleAsync(botMember, roomRole);
-
-            IDictionary<ulong, DiscordMember> members = (await context.Guild.GetAllMembersAsync())
-                .ToDictionary(member => member.Id, member => member);
-            IEnumerable<DiscordMember> admins = members.Values.Where(member => IsAdminUser(context, member));
-            foreach (DiscordMember admin in admins)
+            List<Task> addTeamRolesToChannel = new List<Task>();
+            foreach (Team team in game.Teams)
             {
-                grantRoomRole.Add(context.Guild.GrantRoleAsync(admin, roomRole));
-            }
-
-            foreach (ulong id in state.DirectorIds)
-            {
-                if (members.TryGetValue(id, out DiscordMember director))
+                if (!roles.TeamRoles.TryGetValue(team, out DiscordRole role))
                 {
-                    grantRoomRole.Add(context.Guild.GrantRoleAsync(director, roomRole));
+                    Console.Error.WriteLine($"Team {team.Name} did not have a role defined.");
+                    continue;
                 }
+
+                addTeamRolesToChannel.Add(channel.AddOverwriteAsync(role, teamAllowedPermissions, Permissions.None));
             }
 
-            IEnumerable<ulong> playerIds = state.Players
-                .Join(game.Teams, player => player.Team, team => team, (player, team) => player.Id);
-            foreach (ulong id in playerIds)
-            {
-                if (members.TryGetValue(id, out DiscordMember player))
-                {
-                    grantRoomRole.Add(context.Guild.GrantRoleAsync(player, roomRole));
-                }
-            }
+            // TODO: Determine if admins need a separate role, or need to be granted permissions.
 
-            await Task.WhenAll(grantRoomRole);
-
-            // TODO: When we figure out how to avoid the throttling (and make it trickle in), bring back the message.
-            ////string channelMention = voiceChannels[GetVoiceRoomName(game.Reader)].Mention;
-            ////await channel.SendMessageAsync($"Players: join this voice channel when your moderator tells you to: {channelMention}");
+            await Task.WhenAll(addTeamRolesToChannel);
         }
 
         // Removes channels and roles.
-        private static async Task CleanupTournamentArtifcats(CommandContext context, TournamentState state)
+        private static async Task CleanupTournamentArtifacts(CommandContext context, TournamentState state)
         {
             // Simplest way is to delete all channels that are not a main channel
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
@@ -635,29 +709,38 @@ namespace QBDiscordAssistant.Discord
                 }
             }
 
-            // Remove the reader role
-            DiscordRole readerRole = context.Guild.Roles.FirstOrDefault(r => r.Name == "Reader");
-            if (readerRole != null)
-            {
-                await context.Guild.DeleteRoleAsync(readerRole);
-            }
-
             // TODO: Remove the channel roles
             // They all start with Role_. This will make sure that, even if a reader is removed from the list somehow,
             // we get all of the roles
             List<Task> deleteRolesTask = new List<Task>();
-            
-            // We need this out of the loop because the role could be deleted while we are enumerating through it.
-            DiscordRole[] roomRoles = context.Guild.Roles.Where(r => r.Name.StartsWith("Round_")).ToArray();
-            foreach (DiscordRole role in roomRoles)
+
+            IReadOnlyList<DiscordRole> roles = context.Guild.Roles;
+            foreach (DiscordRole role in roles)
             {
-                deleteRolesTask.Add(context.Guild.DeleteRoleAsync(role));
+                string roleName = role.Name;
+                if (roleName == DirectorRoleName ||
+                    roleName.StartsWith(ReaderRoomRolePrefix) ||
+                    roleName.StartsWith(TeamRolePrefix))
+                {
+                    deleteRolesTask.Add(context.Guild.DeleteRoleAsync(role));
+                }
             }
 
             await Task.WhenAll(deleteChannelsTask);
             await Task.WhenAll(deleteRolesTask);
+            state.Stage = TournamentStage.Complete;
             await context.Channel.SendMessageAsync(
                 $"All tournament channels and roles removed. Tournament '{state.Name}' is now finished.");
+        }
+
+        private static string GetTeamRoleName(Team team)
+        {
+            return $"{TeamRolePrefix}{team.Name}";
+        }
+
+        private static string GetRoomReaderRoleName(int roundNumber)
+        {
+            return $"{ReaderRoomRolePrefix}{roundNumber + 1}";
         }
 
         private static string GetTextRoomName(Reader reader, int roundNumber)
@@ -665,9 +748,9 @@ namespace QBDiscordAssistant.Discord
             return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_")}";
         }
 
-        private static string GetVoiceRoomName(Reader reader)
+        private static string GetVoiceRoomName(int index)
         {
-            return $"{reader.Name.Replace(" ", "_")}'s_Voice_Room";
+            return $"Room_{index}'s_Voice_Channel";
         }
 
         private static bool IsMainChannel(CommandContext context)
@@ -757,6 +840,13 @@ namespace QBDiscordAssistant.Discord
             if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
             {
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (manager.CurrentTournament.Stage > TournamentStage.BotSetup)
+                {
+                    // TODO: Support adding readers after a tournament has begun. We need to add the proper role, or
+                    // swap with someone else.
+                    context.Member.SendMessageAsync("Adding readers after the tournament has started is not supported.");
+                }
+
                 foreach (DiscordMember member in members)
                 {
                     manager.CurrentTournament.Readers.Add(new Reader()
@@ -822,6 +912,15 @@ namespace QBDiscordAssistant.Discord
             }
 
             return Task.CompletedTask;
+        }
+
+        private class TournamentRoles
+        {
+            public DiscordRole DirectorRole { get; set; }
+
+            public DiscordRole[] RoomReaderRoles { get; set; }
+
+            public Dictionary<Team, DiscordRole> TeamRoles { get; set; }
         }
     }
 }
