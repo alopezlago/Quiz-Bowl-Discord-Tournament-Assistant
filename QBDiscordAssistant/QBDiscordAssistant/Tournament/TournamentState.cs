@@ -12,6 +12,8 @@ namespace QBDiscordAssistant.Tournament
             this.Players = new HashSet<Player>();
             this.Teams = new HashSet<Team>();
             this.Readers = new HashSet<Reader>();
+            this.SymbolToTeam = new Dictionary<string, Team>();
+            this.JoinTeamMessageIds = new HashSet<ulong>();
         }
 
         // Name acts as an ID
@@ -29,6 +31,10 @@ namespace QBDiscordAssistant.Tournament
         public ISet<Team> Teams { get; private set; }
 
         public ISet<Reader> Readers { get; private set; }
+
+        public IDictionary<string, Team> SymbolToTeam { get; private set; }
+
+        public ISet<ulong> JoinTeamMessageIds { get; private set; }
 
         // This should influence Schedule... leaving it here for now, but maybe it should moved to Schedule
         public int RoundRobinsCount { get; set; }

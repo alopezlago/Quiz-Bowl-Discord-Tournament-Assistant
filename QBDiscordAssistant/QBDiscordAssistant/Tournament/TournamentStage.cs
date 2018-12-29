@@ -3,7 +3,10 @@
     public enum TournamentStage
     {
         Created,
-        PlayerSetup,
+        AddReaders,
+        SetRoundRobins,
+        AddTeams,
+        AddPlayers,
         BotSetup,
         Running,
         Complete

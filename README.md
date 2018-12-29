@@ -14,6 +14,7 @@ SendMessages
 KickMembers
 MuteMembers
 DeafenMembers
+AddReactions
 PrioritySpeaker (256)
 
 

@@ -2,8 +2,6 @@
 using DSharpPlus.CommandsNext;
 using QBDiscordAssistant.Tournament;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -19,6 +17,9 @@ namespace QBDiscordAssistant.Discord
         private readonly BotConfiguration options;
         private readonly DiscordClient discordClient;
         private readonly CommandsNextModule commandsModule;
+        private readonly BotEventHandler eventHandler;
+
+        private bool isDisposed = false;
 
         public Bot(BotConfiguration configuration)
         {
@@ -47,6 +48,8 @@ namespace QBDiscordAssistant.Discord
             });
 
             this.commandsModule.RegisterCommands<BotCommands>();
+
+            this.eventHandler = new BotEventHandler(this.discordClient, manager);
         }
 
         public Task ConnectAsync()
@@ -57,12 +60,12 @@ namespace QBDiscordAssistant.Discord
         // This likely won't be called, but the client is IDisposable so we should do our due diligence.
         public void Dispose()
         {
-            this.discordClient.Dispose();
-        }
-
-        private bool IsBuzz(string buzzText)
-        {
-            return BuzzRegex.IsMatch(buzzText);
+            if (!this.isDisposed)
+            {
+                this.eventHandler.Dispose();
+                this.discordClient.Dispose();
+                this.isDisposed = true;
+            }
         }
     }
 }

@@ -5,7 +5,6 @@ using DSharpPlus.Entities;
 using QBDiscordAssistant.Tournament;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -151,107 +150,11 @@ namespace QBDiscordAssistant.Discord
                 // TODO: Consider moving this message to a constant.
                 manager.CurrentTournament = state;
                 manager.PendingTournaments.Remove(tournamentName);
-                state.Stage = TournamentStage.PlayerSetup;
-                StringBuilder builder = new StringBuilder();
-                builder.AppendLine($"Begin setup phase for '{tournamentName}'");
-                builder.AppendLine("Add readers with !addReader *@user*");
-                builder.AppendLine("Add teams with !addTeam *team*");
-                builder.AppendLine("Set the number of round robins with !setRoundRobins *# of round robins*");
-                builder.AppendLine("Players can join their team with !jointeam *team*");
-                builder.AppendLine("Once everything is set up, the director beings the tournament with !start");
-
-                return context.Channel.SendMessageAsync(builder.ToString());
-            }
-
-            return Task.CompletedTask;
-        }
-
-        [Command("addReader")]
-        [Description("Add a reader.")]
-        public Task AddReader(
-            CommandContext context, 
-            [Description("Member to add as a reader (as a @mention).")] DiscordMember member)
-        {
-            return this.AddReadersHelper(context, member);
-        }
-
-        [Command("addReaders")]
-        [Description("Adds multiple readers to the current tournament.")]
-        public Task AddReader(
-            CommandContext context,
-            [Description("List of members to add as readers to the current tournament (as @mentions).")] params DiscordMember[] members)
-        {
-            return this.AddReadersHelper(context, members);
-        }
-
-        [Command("removeReader")]
-        [Description("Removes a reader.")]
-        public Task RemovesReader(
-            CommandContext context,
-            [Description("Member to remove as a reader (as a @mention).")] DiscordMember member)
-        {
-            return this.RemoveReadersHelper(context, member);
-        }
-
-        [Command("removeReaders")]
-        [Description("Removes readers from the current tournament.")]
-        public Task RemoveReaders(
-            CommandContext context,
-            [Description("List of members to remove as readers from the current tournament (as @mentions).")] params DiscordMember[] members)
-        {
-            return this.RemoveReadersHelper(context, members);
-        }
-
-        [Command("addTeam")]
-        [Description("Addsa team to the current tournament.")]
-        public Task AddTeam(
-            CommandContext context,
-            [Description("Team name")] params string[] rawTeamNameParts)
-        {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                // Escape the arguments
-                for (int i = 0; i < rawTeamNameParts.Length; i++)
-                {
-                    rawTeamNameParts[i] = rawTeamNameParts[i].Replace(",,", ",");
-                }
-
-                return this.AddTeams(context, rawTeamNameParts);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        [Command("addTeams")]
-        [Description("Adds teams to the current tournament.")]
-        public Task AddTeams(
-            CommandContext context,
-            [Description("Team names, separated by commas. If the team name has a comma, use two commas to escape it.")] params string[] rawTeamNameParts)
-        {
-            return this.AddTeamsHelper(context, rawTeamNameParts);
-        }
-
-        [Command("removeTeam")]
-        [Description("Removes a team.")]
-        public Task RemoveTeam(
-            CommandContext context,
-            [Description("Team name.")] params string[] rawTeamNameParts)
-        {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                string teamName = string.Join(" ", rawTeamNameParts).Trim();
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                if (manager.CurrentTournament.Teams.Remove(new Team()
-                {
-                    Name = teamName
-                }))
-                {
-                    return context.Channel.SendMessageAsync("Team removed.");
-                }
-                else
-                {
-                    return context.Channel.SendMessageAsync("Team does not exist.");
-                }
+                state.Stage = TournamentStage.AddReaders;
+                DiscordEmbedBuilder builder = new DiscordEmbedBuilder();
+                builder.Title = "Add Readers";
+                builder.Description = "List the mentions of all of the readers. For example, '@Reader_1 @Reader_2 @Reader_3'. If you forgot a reader, you can still use !addReaders during the add teams phase.";
+                return context.Channel.SendMessageAsync(embed: builder.Build());
             }
 
             return Task.CompletedTask;
@@ -326,85 +229,6 @@ namespace QBDiscordAssistant.Discord
             return Task.CompletedTask;
         }
 
-        // TODO: Refactor so that this shares the same code as addPlayer/removePlayer
-        [Command("joinTeam")]
-        [Description("Join a team.")]
-        public Task JoinTeam(
-            CommandContext context,
-            [Description("Team name.")] params string[] rawTeamNameParts)
-        {
-            if (IsMainChannel(context))
-            {
-                string teamName = string.Join(" ", rawTeamNameParts).Trim();
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                Team team = new Team()
-                {
-                    Name = teamName
-                };
-                if (manager.CurrentTournament.Teams.Contains(team))
-                {
-                    if (manager.CurrentTournament.Players.Add(new Player()
-                    {
-                        Id = context.User.Id,
-                        Team = team
-                    }))
-                    {
-                        return context.Channel.SendMessageAsync($"{context.User.Mention} joined team.");
-                    }
-                    else
-                    {
-                        return context.Channel.SendMessageAsync($"{context.User.Mention} is already on a team. Use !leaveteam to drop out.");
-                    }
-                }
-                else
-                {
-                    return context.Channel.SendMessageAsync("Team does not exist.");
-                }
-            }
-
-            return Task.CompletedTask;
-        }
-
-        [Command("leaveTeam")]
-        [Description("Leave a team.")]
-        public Task LeaveTeam(CommandContext context)
-        {
-            if (IsMainChannel(context))
-            {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                Player player = new Player()
-                {
-                    Id = context.User.Id
-                };
-                if (manager.CurrentTournament.Players.Remove(player))
-                {
-                    return context.Channel.SendMessageAsync($"{context.User.Mention} left their team.");
-                }
-                else
-                {
-                    return context.Channel.SendMessageAsync($"{context.User.Mention} is not on any team.");
-                }
-            }
-
-            return Task.CompletedTask;
-        }
-
-        [Command("setRoundRobins")]
-        [Description("Sets the number of round robins to run.")]
-        public Task SetRoundRobins(
-            CommandContext context,
-            [Description("Number of round robins to have.")] int roundRobinsCount)
-        {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
-            {
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                manager.CurrentTournament.RoundRobinsCount = roundRobinsCount;
-                return context.Member.SendMessageAsync("Round robins set.");
-            }
-
-            return Task.CompletedTask;
-        }
-
         [Command("start")]
         [Description("Starts the current tournament")]
         public async Task Start(CommandContext context)
@@ -421,7 +245,7 @@ namespace QBDiscordAssistant.Discord
                 manager.CurrentTournament.Stage = TournamentStage.BotSetup;
                 await context.Channel.SendMessageAsync("Initializing the schedule...");
 
-                // TODO: We should try to move this out of the Bot class.
+                // TODO: Add more messaging around the current status
                 IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(manager.CurrentTournament.RoundRobinsCount);
                 manager.CurrentTournament.Schedule = scheduleFactory.Generate(
                     manager.CurrentTournament.Teams, manager.CurrentTournament.Readers);
@@ -446,6 +270,7 @@ namespace QBDiscordAssistant.Discord
                 TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
                 if (manager.CurrentTournament != null)
                 {
+                    // TODO: Add more messaging around the current status
                     await CleanupTournamentArtifacts(context, manager.CurrentTournament);
 
                     string tournamentName = manager.CurrentTournament.Name;
@@ -453,6 +278,10 @@ namespace QBDiscordAssistant.Discord
                 }
             }
         }
+
+        // TODO: Implement !back, which will go back a stage.
+        // This does mean that, if we go back to add players, we'll need to re-send the messages, and possibly clear
+        // all the players so that the reactions are consistent.
 
         // Commands:
         // Note that Admins can perform all TD actions.
