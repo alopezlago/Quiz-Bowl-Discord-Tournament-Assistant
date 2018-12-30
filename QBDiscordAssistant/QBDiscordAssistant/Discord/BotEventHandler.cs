@@ -114,6 +114,8 @@ namespace QBDiscordAssistant.Discord
 
             // TODO: We need to have locks on these. Need to check the stages between locks, and ignore the message if
             // it changes.
+            // Issue is that we should really rely on a command for this case. Wouldn't quite work with locks.
+            // But that would be something like !start, which would stop the rest of the interaction.
             switch (this.manager.CurrentTournament.Stage)
             {
                 case TournamentStage.AddReaders:
@@ -125,9 +127,6 @@ namespace QBDiscordAssistant.Discord
                 case TournamentStage.AddTeams:
                     await this.HandleAddTeamsStage(args);
                     break;
-                // TODO: Need to handle the next stage, and determine where locking should occur (manager access?)
-                // Issue is that we should really rely on a command for this case. Wouldn't quite work with locks.
-                // But that would be something like !start, which would stop the rest of the interaction.
                 default:
                     break;
             }
@@ -137,58 +136,6 @@ namespace QBDiscordAssistant.Discord
         {
             return member.IsOwner ||
                 (channel.PermissionsFor(member) & Permissions.Administrator) == Permissions.Administrator;
-        }
-
-        private static bool TryGetTeamNamesFromParts(
-            string combinedTeamNames, out HashSet<string> teamNames, out string errorMessage)
-        {
-            errorMessage = null;
-            teamNames = new HashSet<string>();
-
-            bool possibleCommaEscapeStart = false;
-            int startIndex = 0;
-            int length;
-            string teamName;
-            for (int i = 0; i < combinedTeamNames.Length; i++)
-            {
-                char token = combinedTeamNames[i];
-                if (token == ',')
-                {
-                    // If the previous token was a comma, then this is an escape (i.e. this character won't be the
-                    // start of an escape). If not, then this could be the start of an escape.
-                    possibleCommaEscapeStart = !possibleCommaEscapeStart;
-                }
-                else if (possibleCommaEscapeStart)
-                {
-                    // The previous character was a comma, but this one isn't, so it's a separator. Get the team
-                    // name.
-                    length = Math.Max(0, i - startIndex - 1);
-                    teamName = combinedTeamNames
-                        .Substring(startIndex, length)
-                        .Trim()
-                        .Replace(",,", ",");
-                    teamNames.Add(teamName);
-                    startIndex = i;
-                    possibleCommaEscapeStart = false;
-                }
-            }
-
-            // Add the remaining team.
-            if (combinedTeamNames[combinedTeamNames.Length - 1] == ',' && possibleCommaEscapeStart)
-            {
-                errorMessage = "team missing from addTeams (trailing comma)";
-                return false;
-            }
-
-            // No comma, so don't subtract 1.
-            length = Math.Max(0, combinedTeamNames.Length - startIndex);
-            teamName = combinedTeamNames
-                .Substring(startIndex, length)
-                .Trim()
-                .Replace(",,", ",");
-            teamNames.Add(teamName);
-
-            return true;
         }
 
         private static bool TryGetEmojis(
@@ -294,7 +241,8 @@ namespace QBDiscordAssistant.Discord
 
         private async Task HandleAddTeamsStage(MessageCreateEventArgs args)
         {
-            if (!TryGetTeamNamesFromParts(args.Message.Content, out HashSet<string> teamNames, out string errorMessage))
+            if (!TeamNameParser.TryGetTeamNamesFromParts(
+                args.Message.Content, out HashSet<string> teamNames, out string errorMessage))
             {
                 await args.Channel.SendMessageAsync(errorMessage);
                 return;

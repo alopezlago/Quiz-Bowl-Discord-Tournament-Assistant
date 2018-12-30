@@ -92,14 +92,7 @@ namespace QBDiscordAssistant.Tournament
                     round.Games.Add(new Game()
                     {
                         Teams = new Team[] { firstTeam, secondTeam },
-                        Reader = reader,
-                        // TODO: Figure out how to generate the room, since we don't have the Id yet.
-                        Room = new Room()
-                        {
-                            // The Id must be filled in later, or we need to pass in something which creates these rooms.
-                            Reader = reader,
-                            Name = $"Round{roundNumber}-{reader.Name}"
-                        }
+                        Reader = reader
                     });
                 }
             }

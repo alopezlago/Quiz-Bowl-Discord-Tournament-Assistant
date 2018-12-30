@@ -36,6 +36,7 @@ Starting a tournament:
 
 
 TODO: Add support for finals
+TODO: Ignore commands in message event handler
 TODO: Add multi-guild support
 TODO: Write guide for how to start a tournament as a TD
 TODO: Add persistence of tournaments

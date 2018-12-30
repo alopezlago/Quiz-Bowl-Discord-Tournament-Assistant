@@ -6,9 +6,11 @@ namespace QBDiscordAssistant.Tournament
 {
     public class TournamentState
     {
+        // TODO: Move away from publically exposing collection methods.
         public TournamentState()
         {
             this.DirectorIds = new HashSet<ulong>();
+            this.TeamRoleIds = new Dictionary<Team, ulong>();
             this.Players = new HashSet<Player>();
             this.Teams = new HashSet<Team>();
             this.Readers = new HashSet<Reader>();
@@ -19,9 +21,17 @@ namespace QBDiscordAssistant.Tournament
         // Name acts as an ID
         public string Name { get; set; }
 
+        // TODO: Need to gate commands and events based on this. Otherwise tournament state can be modified on other
+        // servers.
         public ulong GuildId { get; set; }
 
-        // TODO: Consider making this Ids, since Director is not very useful
+        // TODO: Group this in a class (maybe TournamentRoleIds)
+        public ulong DirectorRoleId { get; set; }
+
+        public ulong[] ReaderRoomRoleIds { get; set; }
+
+        public Dictionary<Team, ulong> TeamRoleIds { get; set; }
+
         public ISet<ulong> DirectorIds { get; private set; }
 
         public TournamentStage Stage { get; set; }
