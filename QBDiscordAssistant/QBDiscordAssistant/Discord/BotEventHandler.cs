@@ -234,13 +234,10 @@ namespace QBDiscordAssistant.Discord
 
         private bool HasTournamentDirectorPrivileges(DiscordChannel channel, DiscordMember member)
         {
-            if (IsAdminUser(channel, member))
-            {
-                return true;
-            }
-
             // TD is only allowed to run commands when they are a director of the current tournament.
-            return this.manager.CurrentTournament != null && manager.CurrentTournament.DirectorIds.Contains(member.Id);
+            return this.manager.CurrentTournament != null &&
+                manager.CurrentTournament.GuildId == channel.GuildId &&
+                (IsAdminUser(channel, member) || manager.CurrentTournament.DirectorIds.Contains(member.Id));
         }
 
         private async Task HandleAddReadersStage(MessageCreateEventArgs args)
@@ -396,6 +393,7 @@ namespace QBDiscordAssistant.Discord
 
         private Player GetPlayerFromReactionEventOrNull(DiscordUser user, ulong messageId, string emojiName)
         {
+            // TODO: since we have the message ID it's unlikely we need to verify the guild, but we should double check.
             if (user.IsCurrent ||
                 this.manager.CurrentTournament == null ||
                 !this.manager.CurrentTournament.JoinTeamMessageIds.Contains(messageId) ||

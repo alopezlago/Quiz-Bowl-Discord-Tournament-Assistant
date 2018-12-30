@@ -596,14 +596,11 @@ namespace QBDiscordAssistant.Discord
 
         private static bool HasTournamentDirectorPrivileges(CommandContext context)
         {
-            if (IsAdminUser(context, context.Member))
-            {
-                return true;
-            }
-
             // TD is only allowed to run commands when they are a director of the current tournament.
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-            return manager.CurrentTournament != null && manager.CurrentTournament.DirectorIds.Contains(context.User.Id);
+            return manager.CurrentTournament != null &&
+                manager.CurrentTournament.GuildId == context.Guild.Id &&
+                (IsAdminUser(context, context.Member) || manager.CurrentTournament.DirectorIds.Contains(context.User.Id));
         }
 
         private static bool TryGetTeamNamesFromParts(string[] rawTeamNameParts, out HashSet<string> teamNames, out string errorMessage)

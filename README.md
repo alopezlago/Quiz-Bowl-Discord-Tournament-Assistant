@@ -23,15 +23,13 @@ Starting a tournament:
     !addTD @my_user <My tournament name>
   2. Start the setup phase with !setup
     !setup
-  3. Add the readres with !addReader
-    !addReader @reader_user
-  4. Add teams with !addTeams
-    !addTeams <comma-separated list of teams>
-  5. Add players to teams with !addPlayer. Players can also join teams with !joinTeam. If they need to leave, use !removePlayer or !leaveTeam.
-    !addPlayer @player_user <team>
-    !joinTeam <team>
-  6. Set the number of round robins to play with !setRoundRobins.
-    !setRoundRobins <number of round robins>
+  3. Add all of the readers based on their mentions.
+     @Reader1  @Reader2
+  4. Set the number of round robins to play with
+    3
+  5. Add all of the teams in the tournament
+    Team 1, Team 2, Team 3
+  6. Players will join their team by clicking on the reaction that matches the team.
   7. Start the tournament with !start.
     !start
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
