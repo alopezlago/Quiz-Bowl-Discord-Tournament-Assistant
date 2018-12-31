@@ -409,8 +409,11 @@ namespace QBDiscordAssistant.Discord
                     TeamRoles = teamRoles
                 };
 
+                DiscordChannel finalsCategoryChannel = await context.Guild.CreateChannelAsync(
+                    $"Finals", ChannelType.Category);
                 DiscordChannel channel = await CreateTextChannel(
                     context,
+                    finalsCategoryChannel,
                     finalsGame,
                     tournamentRoles,
                     finalsRoundNumber,
@@ -532,9 +535,13 @@ namespace QBDiscordAssistant.Discord
             foreach (Round round in state.Schedule.Rounds)
             {
                 int roomNumber = 0;
+                DiscordChannel roundCategoryChannel = await context.Guild.CreateChannelAsync(
+                    $"Round {roundNumber}", ChannelType.Category);
+
                 foreach (Game game in round.Games)
                 {
-                    createTextChannelsTasks.Add(CreateTextChannel(context, game, roles, roundNumber, roomNumber));
+                    createTextChannelsTasks.Add(
+                        CreateTextChannel(context, roundCategoryChannel, game, roles, roundNumber, roomNumber));
                     roomNumber++;
                 }
 
@@ -635,11 +642,11 @@ namespace QBDiscordAssistant.Discord
         // TODO: Pass in the parent channel (category channel)
         // TODO: Pass in the Bot member
         private static async Task<DiscordChannel> CreateTextChannel(
-            CommandContext context, Game game, TournamentRoles roles, int roundNumber, int roomNumber)
+            CommandContext context, DiscordChannel parent, Game game, TournamentRoles roles, int roundNumber, int roomNumber)
         {
             // The room and role names will be the same.
             string name = GetTextRoomName(game.Reader, roundNumber);
-            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Text);
+            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, ChannelType.Text, parent);
             // Prevent people from seeing the text channel by default.
             await channel.AddOverwriteAsync(
                 context.Guild.EveryoneRole, 
@@ -683,6 +690,7 @@ namespace QBDiscordAssistant.Discord
         private static async Task CleanupTournamentArtifacts(CommandContext context, TournamentState state)
         {
             // Simplest way is to delete all channels that are not a main channel
+            // TODO: Store channel IDs in the state and delete those
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
             List<Task> deleteChannelsTask = new List<Task>();
             foreach (DiscordChannel channel in context.Guild.Channels)
