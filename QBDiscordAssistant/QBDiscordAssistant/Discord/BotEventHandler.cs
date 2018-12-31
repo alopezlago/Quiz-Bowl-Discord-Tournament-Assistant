@@ -16,7 +16,6 @@ namespace QBDiscordAssistant.Discord
         private const int TeamCountLimit = 9 + 26;
         private const int ReaderCountLimit = TeamCountLimit / 2;
         private const int MaxTeamsInMessage = 20;
-        private const int MaxRoundRobins = 10;
 
         private readonly DiscordClient client;
         private readonly TournamentsManager manager;
@@ -103,6 +102,12 @@ namespace QBDiscordAssistant.Discord
             if (args.Author.IsCurrent ||
                 this.manager.CurrentTournament == null)
             {
+                return;
+            }
+
+            if (args.Message.Content.TrimStart().StartsWith("!"))
+            {
+                // Ignore commands
                 return;
             }
 
@@ -208,12 +213,7 @@ namespace QBDiscordAssistant.Discord
 
             await args.Channel.SendMessageAsync(
                 $"{this.manager.CurrentTournament.Readers.Count} readers total for the tournament.");
-
-            this.manager.CurrentTournament.Stage = TournamentStage.SetRoundRobins;
-            DiscordEmbedBuilder addTeamsEmbedBuilder = new DiscordEmbedBuilder();
-            addTeamsEmbedBuilder.Title = "Set the number of round robins";
-            addTeamsEmbedBuilder.Description = $"Specify the number of round-robin rounds as an integer (from 1 to {MaxRoundRobins}).";
-            await args.Channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
+            await this.UpdateStage(args.Channel, TournamentStage.SetRoundRobins);
         }
 
         private async Task HandleSetRoundRobinsStage(MessageCreateEventArgs args)
@@ -222,21 +222,14 @@ namespace QBDiscordAssistant.Discord
             {
                 return;
             }
-            else if (rounds <= 0 || rounds > MaxRoundRobins)
+            else if (rounds <= 0 || rounds > TournamentState.MaxRoundRobins)
             {
-                await args.Channel.SendMessageAsync($"Invalid number of round robins. The number must be between 1 and {MaxRoundRobins}");
+                await args.Channel.SendMessageAsync($"Invalid number of round robins. The number must be between 1 and {TournamentState.MaxRoundRobins}");
                 return;
             }
 
             this.manager.CurrentTournament.RoundRobinsCount = rounds;
-
-            this.manager.CurrentTournament.Stage = TournamentStage.AddTeams;
-            DiscordEmbedBuilder addTeamsEmbedBuilder = new DiscordEmbedBuilder();
-            int maxTeamsCount = this.GetMaximumTeamCount();
-            addTeamsEmbedBuilder.Title = "Add Teams";
-            addTeamsEmbedBuilder.Description =
-                $"Add a list of comma-separated team names. If the team name has a comma, use another comma to escape it (like ,,). You can add a maximum of {maxTeamsCount} teams";
-            await args.Channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
+            await this.UpdateStage(args.Channel, TournamentStage.AddTeams);
         }
 
         private async Task HandleAddTeamsStage(MessageCreateEventArgs args)
@@ -281,7 +274,7 @@ namespace QBDiscordAssistant.Discord
                 return;
             }
 
-            this.manager.CurrentTournament.Stage = TournamentStage.AddPlayers;
+            await this.UpdateStage(args.Channel, TournamentStage.AddPlayers);
 
             this.manager.CurrentTournament.SymbolToTeam.Clear();
             int emojiIndex = 0;
@@ -373,6 +366,20 @@ namespace QBDiscordAssistant.Discord
                 Team = team
             };
             return player;
+        }
+
+        private async Task UpdateStage(DiscordChannel channel, TournamentStage stage)
+        {
+            this.manager.CurrentTournament.UpdateStage(stage, out string title, out string instructions);
+            if (title == null && instructions == null)
+            {
+                return;
+            }
+
+            DiscordEmbedBuilder addTeamsEmbedBuilder = new DiscordEmbedBuilder();
+            addTeamsEmbedBuilder.Title = title;
+            addTeamsEmbedBuilder.Description = instructions;
+            await channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
         }
     }
 }

@@ -35,8 +35,9 @@ Starting a tournament:
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
 
 
-TODO: Add support for finals
-TODO: Ignore commands in message event handler
+TODO: Do some refactoring of tournament state to separate individual fields into more explainable components
+TODO: Create parent category channels for each round
+TODO: Add command to switch readers (may not be needed since you can just assign the role to the user)
 TODO: Add multi-guild support
 TODO: Write guide for how to start a tournament as a TD
 TODO: Add persistence of tournaments

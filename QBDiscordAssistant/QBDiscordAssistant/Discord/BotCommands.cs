@@ -138,9 +138,8 @@ namespace QBDiscordAssistant.Discord
                 return Task.CompletedTask;
             }
 
-            // TODO (Bug): Prevent the setup of two separate tournaments at the same time. This will require a new
-            // TournamentStage, and will require checking the tournament stage here.
-
+            // TODO (Bug): Prevent the setup of two separate tournaments at the same time. This will require locking
+            // the stage.
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             if (manager.PendingTournaments.TryGetValue(tournamentName, out TournamentState state) &&
@@ -151,11 +150,7 @@ namespace QBDiscordAssistant.Discord
                 // TODO: Consider moving this message to a constant.
                 manager.CurrentTournament = state;
                 manager.PendingTournaments.Remove(tournamentName);
-                state.Stage = TournamentStage.AddReaders;
-                DiscordEmbedBuilder builder = new DiscordEmbedBuilder();
-                builder.Title = "Add Readers";
-                builder.Description = "List the mentions of all of the readers. For example, '@Reader_1 @Reader_2 @Reader_3'. If you forgot a reader, you can still use !addReaders during the add teams phase.";
-                return context.Channel.SendMessageAsync(embed: builder.Build());
+                return UpdateStage(context.Channel, manager.CurrentTournament, TournamentStage.AddReaders);
             }
 
             return Task.CompletedTask;
@@ -243,8 +238,7 @@ namespace QBDiscordAssistant.Discord
                     return;
                 }
 
-                manager.CurrentTournament.Stage = TournamentStage.BotSetup;
-                await context.Channel.SendMessageAsync("Initializing the schedule...");
+                await UpdateStage(context.Channel, manager.CurrentTournament, TournamentStage.BotSetup);
 
                 // TODO: Add more messaging around the current status
                 IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(manager.CurrentTournament.RoundRobinsCount);
@@ -254,12 +248,60 @@ namespace QBDiscordAssistant.Discord
                 await context.Channel.SendMessageAsync("Creating the channels and roles...");
                 await CreateArtifacts(context, manager.CurrentTournament);
 
-                manager.CurrentTournament.Stage = TournamentStage.RunningPrelims;
+                await UpdateStage(context.Channel, manager.CurrentTournament, TournamentStage.RunningPrelims);
                 await context.Channel.SendMessageAsync(
-                    $"{context.Channel.Mention}: tournament has started. Go to your first round room and follow the instructions.");
+                    $"{context.Channel.Mention}: tournament has started.");
             }
 
             return;
+        }
+
+        [Command("back")]
+        [Description("Undoes the current stage and returns to the previous stage.")]
+        public async Task Back(CommandContext context)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (manager.CurrentTournament == null)
+                {
+                    return;
+                }
+
+                switch (manager.CurrentTournament.Stage)
+                {
+                    case TournamentStage.SetRoundRobins:
+                        manager.CurrentTournament.Readers.Clear();
+                        break;
+                    case TournamentStage.AddTeams:
+                        manager.CurrentTournament.RoundRobinsCount = 0;
+                        break;
+                    case TournamentStage.AddPlayers:
+                        manager.CurrentTournament.Teams.Clear();
+                        manager.CurrentTournament.SymbolToTeam.Clear();
+
+                        List<Task<DiscordMessage>> getJoinTeamMessagesTasks = new List<Task<DiscordMessage>>();
+                        foreach (ulong id in manager.CurrentTournament.JoinTeamMessageIds)
+                        {
+                            getJoinTeamMessagesTasks.Add(context.Channel.GetMessageAsync(id));
+                        }
+
+                        DiscordMessage[] joinTeamMessages = await Task.WhenAll(getJoinTeamMessagesTasks);
+                        await context.Channel.DeleteMessagesAsync(
+                            joinTeamMessages, "Deleting join team messages since we are redoing the add teams stage.");
+
+                        manager.CurrentTournament.JoinTeamMessageIds.Clear();
+                        break;
+                    default:
+                        // Nothing to go back to, so do nothing.
+                        await context.Member.SendMessageAsync(
+                            $"Cannot go back from the stage {manager.CurrentTournament.Stage.ToString()}.");
+                        return;
+                }
+
+                TournamentStage previousStage = manager.CurrentTournament.Stage - 1;
+                await UpdateStage(context.Channel, manager.CurrentTournament, previousStage);
+            }
         }
 
         [Command("finals")]
@@ -410,7 +452,6 @@ namespace QBDiscordAssistant.Discord
         // !removeTD @user <tournament name> [Admin]
         // !getCurrentTournament [Any]
         // !setup [TD]
-        // !addTeam <team name> [TD]
         // !addPlayer @user <team name> [TD]
         // !removePlayer @user [TD]
         // !nofinal [TD] (TODO later, sets no final, when we move to advantaged final by default)
@@ -674,9 +715,7 @@ namespace QBDiscordAssistant.Discord
 
             await Task.WhenAll(deleteChannelsTask);
             await Task.WhenAll(deleteRolesTask);
-            state.Stage = TournamentStage.Complete;
-            await context.Channel.SendMessageAsync(
-                $"All tournament channels and roles removed. Tournament '{state.Name}' is now finished.");
+            await UpdateStage(context.Channel, state, TournamentStage.Complete);
         }
 
         private static string GetTeamRoleName(Team team)
@@ -718,6 +757,20 @@ namespace QBDiscordAssistant.Discord
             return manager.CurrentTournament != null &&
                 manager.CurrentTournament.GuildId == context.Guild.Id &&
                 (IsAdminUser(context, context.Member) || manager.CurrentTournament.DirectorIds.Contains(context.User.Id));
+        }
+
+        private static async Task UpdateStage(DiscordChannel channel, TournamentState state, TournamentStage stage)
+        {
+            state.UpdateStage(stage, out string title, out string instructions);
+            if (title == null && instructions == null)
+            {
+                return;
+            }
+
+            DiscordEmbedBuilder embedBuilder = new DiscordEmbedBuilder();
+            embedBuilder.Title = title;
+            embedBuilder.Description = instructions;
+            await channel.SendMessageAsync(embed: embedBuilder.Build());
         }
 
         private class TournamentRoles
