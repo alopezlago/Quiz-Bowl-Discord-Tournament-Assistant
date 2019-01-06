@@ -56,7 +56,7 @@ namespace QBDiscordAssistant.Discord
 
             // Because player equality/hashing is only based on the ID, we can check if the player is in the set with
             // the new instance.
-            if (this.manager.CurrentTournament.Players.Contains(player))
+            if (!this.manager.CurrentTournament.TryAddPlayer(player))
             {
                 // TODO: We should remove the reaction they gave instead of this one (this may also require the manage
                 // emojis permission?). This would also require a map from userIds/Players to emojis in the tournament
@@ -69,7 +69,6 @@ namespace QBDiscordAssistant.Discord
                 return;
             }
 
-            this.manager.CurrentTournament.Players.Add(player);
             await member.SendMessageAsync($"You have joined the team {player.Team.Name}");
         }
 
@@ -88,10 +87,10 @@ namespace QBDiscordAssistant.Discord
             // we're removing from the set has the same team as the emoji maps to.
             // TODO: We may want to make this a dictionary of IDs to Players to make this operation efficient. We could
             // use ContainsKey to do the contains checks efficiently.
-            Player storedPlayer = this.manager.CurrentTournament.Players.FirstOrDefault(p => p.Id == args.User.Id);
-            if (storedPlayer?.Team == player.Team)
+            if (this.manager.CurrentTournament.TryGetPlayerTeam(args.User.Id, out Team storedTeam) &&
+                storedTeam == player.Team &&
+                this.manager.CurrentTournament.TryRemovePlayer(args.User.Id))
             {
-                this.manager.CurrentTournament.Players.Remove(player);
                 DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.User.Id);
                 await member.SendMessageAsync($"You have left the team {player.Team.Name}");
             }
@@ -189,7 +188,7 @@ namespace QBDiscordAssistant.Discord
             // TD is only allowed to run commands when they are a director of the current tournament.
             return this.manager.CurrentTournament != null &&
                 manager.CurrentTournament.GuildId == channel.GuildId &&
-                (IsAdminUser(channel, member) || manager.CurrentTournament.DirectorIds.Contains(member.Id));
+                (IsAdminUser(channel, member) || manager.CurrentTournament.IsDirector(member.Id));
         }
 
         private async Task HandleAddReadersStage(MessageCreateEventArgs args)
@@ -203,16 +202,22 @@ namespace QBDiscordAssistant.Discord
                 Name = member.Nickname ?? member.DisplayName
             });
 
-            this.manager.CurrentTournament.Readers.UnionWith(readers);
+            // TODO: Need to determine if we want any messaging here
+            if (!this.manager.CurrentTournament.TryAddReaders(readers))
+            {
+                DiscordMember member = await args.Guild.GetMemberAsync(args.Author.Id);
+                await member.SendMessageAsync("Somebody else has already added readers.");
+                return;
+            }
 
-            if (this.manager.CurrentTournament.Readers.Count == 0)
+            if (!this.manager.CurrentTournament.Readers.Any())
             {
                 await args.Channel.SendMessageAsync("No readers added. There must be at least one reader for a tournament.");
                 return;
             }
 
             await args.Channel.SendMessageAsync(
-                $"{this.manager.CurrentTournament.Readers.Count} readers total for the tournament.");
+                $"{this.manager.CurrentTournament.Readers.Count()} readers total for the tournament.");
             await this.UpdateStage(args.Channel, TournamentStage.SetRoundRobins);
         }
 
@@ -246,29 +251,33 @@ namespace QBDiscordAssistant.Discord
                 {
                     Name = name
                 });
-            this.manager.CurrentTournament.Teams.UnionWith(newTeams);
+            if (!this.manager.CurrentTournament.TryAddTeams(newTeams))
+            {
+                DiscordMember member = await args.Guild.GetMemberAsync(args.Author.Id);
+                await member.SendMessageAsync("Teams have already been added.");
+                return;
+            }
 
-
-            if (this.manager.CurrentTournament.Teams.Count < 2)
+            int teamsCount = this.manager.CurrentTournament.Teams.Count();
+            if (teamsCount < 2)
             {
                 await args.Channel.SendMessageAsync("There must be at least two teams for a tournament. Specify more teams.");
                 return;
             }
 
             int maxTeamsCount = this.GetMaximumTeamCount();
-            if (this.manager.CurrentTournament.Teams.Count > maxTeamsCount)
+            if (teamsCount > maxTeamsCount)
             {
-                this.manager.CurrentTournament.Teams.ExceptWith(newTeams);
+                this.manager.CurrentTournament.TryClearTeams();
                 await args.Channel.SendMessageAsync(
                     $"There are too many teams. This bot can only handle {maxTeamsCount}-team tournaments. None of the teams have been added.");
                 return;
             }
 
-            if (!TryGetEmojis(
-                this.client, this.manager.CurrentTournament.Teams.Count, out DiscordEmoji[] emojis, out errorMessage))
+            if (!TryGetEmojis(this.client, teamsCount, out DiscordEmoji[] emojis, out errorMessage))
             {
                 // Something very strange has happened. Undo the addition and tell the user.
-                this.manager.CurrentTournament.Teams.ExceptWith(newTeams);
+                this.manager.CurrentTournament.TryClearTeams();
                 await args.Channel.SendMessageAsync(
                     $"Unexpected failure adding teams: '{errorMessage}'. None of the teams have been added.");
                 return;
@@ -279,14 +288,14 @@ namespace QBDiscordAssistant.Discord
             this.manager.CurrentTournament.SymbolToTeam.Clear();
             int emojiIndex = 0;
             Debug.Assert(
-                emojis.Length == this.manager.CurrentTournament.Teams.Count,
-                $"Teams ({this.manager.CurrentTournament.Teams.Count}) and emojis ({emojis.Length}) lengths are unequal.");
+                emojis.Length == teamsCount,
+                $"Teams ({teamsCount}) and emojis ({emojis.Length}) lengths are unequal.");
 
             // There are limits to the number of fields in an embed and the number of reactions to a message.
             // They are 25 and 20, respectively. Limit the number of teams per message to this limit.
             // maxFieldSize is an inclusive limit, so we need to include the - 1 to make add a new slot only
             // when that limit is exceeded.
-            int addPlayersEmbedsCount = 1 + (this.manager.CurrentTournament.Teams.Count - 1) / MaxTeamsInMessage;
+            int addPlayersEmbedsCount = 1 + (teamsCount - 1) / MaxTeamsInMessage;
             IEnumerator<Team> teamsEnumerator = this.manager.CurrentTournament.Teams.GetEnumerator();
             List<Task> addReactionsTasks = new List<Task>();
             for (int i = 0; i < addPlayersEmbedsCount; i++)
@@ -329,7 +338,7 @@ namespace QBDiscordAssistant.Discord
 
         private int GetMaximumTeamCount()
         {
-            return this.manager.CurrentTournament.Readers.Count * 2 + 1;
+            return this.manager.CurrentTournament.Readers.Count() * 2 + 1;
         }
 
         private Player GetPlayerFromReactionEventOrNull(DiscordUser user, ulong messageId, string emojiName)
@@ -344,18 +353,12 @@ namespace QBDiscordAssistant.Discord
             }
 
             ulong userId = user.Id;
-            if (this.manager.CurrentTournament.DirectorIds.Contains(userId))
+            if (this.manager.CurrentTournament.IsDirector(userId))
             {
                 return null;
             }
 
-            Reader reader = new Reader()
-            {
-                Id = userId,
-                // Reader uses Id for equality/hashing, so the name doesn't matter for checks
-                Name = user.Username
-            };
-            if (this.manager.CurrentTournament.Readers.Contains(reader))
+            if (this.manager.CurrentTournament.IsReader(userId))
             {
                 return null;
             }
