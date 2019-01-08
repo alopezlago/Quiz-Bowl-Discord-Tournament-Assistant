@@ -5,6 +5,7 @@ using DSharpPlus.Entities;
 using QBDiscordAssistant.Tournament;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -341,9 +342,9 @@ namespace QBDiscordAssistant.Discord
                 }
 
                 Team[] teams = teamNames.Select(name => new Team()
-                    {
-                        Name = name
-                    })
+                {
+                    Name = name
+                })
                     .ToArray();
                 if (manager.CurrentTournament.Teams.Intersect(teams).Count() != teams.Length)
                 {
@@ -475,13 +476,17 @@ namespace QBDiscordAssistant.Discord
             state.TeamRoleIds = teamRoles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Id);
 
             // Create the voice channels
-            int roomsCount = state.Teams.Count() / 2;
             List<Task<DiscordChannel>> createVoiceChannelsTasks = new List<Task<DiscordChannel>>();
-            for (int i = 0; i < roomsCount; i++)
+            // We only need to go through the games for the first round to get all of the readers.
+            Round firstRound = state.Schedule.Rounds.First();
+            Debug.Assert(firstRound.Games.Select(game => game.Reader.Name).Count() ==
+                firstRound.Games.Select(game => game.Reader.Name).Distinct().Count(),
+                "All reader names should be unique.");
+            foreach (Game game in firstRound.Games)
             {
-                // TODO: See if we have an existing channel with that name, and delete it.
-                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, roles, i));
+                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, roles, game.Reader));
             }
+
             await Task.WhenAll(createVoiceChannelsTasks);
 
             // Create the text channels
@@ -513,9 +518,9 @@ namespace QBDiscordAssistant.Discord
         }
 
         private static async Task<DiscordChannel> CreateVoiceChannel(
-            CommandContext context, TournamentRoles roles, int roomIndex)
+            CommandContext context, TournamentRoles roles, Reader reader)
         {
-            string name = GetVoiceRoomName(roomIndex);
+            string name = GetVoiceRoomName(reader);
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice);
             return channel;
         }
@@ -603,7 +608,7 @@ namespace QBDiscordAssistant.Discord
             DiscordChannel channel = await context.Guild.CreateChannelAsync(name, ChannelType.Text, parent);
             // Prevent people from seeing the text channel by default.
             await channel.AddOverwriteAsync(
-                context.Guild.EveryoneRole, 
+                context.Guild.EveryoneRole,
                 Permissions.None,
                 Permissions.ReadMessageHistory | Permissions.AccessChannels);
 
@@ -695,9 +700,9 @@ namespace QBDiscordAssistant.Discord
             return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_")}";
         }
 
-        private static string GetVoiceRoomName(int index)
+        private static string GetVoiceRoomName(Reader reader)
         {
-            return $"Room_{index}'s_Voice_Channel";
+            return $"{reader.Name}'s_Voice_Channel";
         }
 
         private static bool IsMainChannel(CommandContext context)
