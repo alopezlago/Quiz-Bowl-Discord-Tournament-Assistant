@@ -217,6 +217,35 @@ namespace QBDiscordAssistant.Discord
             return Task.CompletedTask;
         }
 
+        [Command("getPlayers")]
+        [Description("Gets the players in the current tournament, grouped by their team.")]
+        public async Task GetPlayers(CommandContext context)
+        {
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (manager.CurrentTournament == null)
+                {
+                    return;
+                }
+
+                IEnumerable<Tuple<Team, IEnumerable<Player>>> teamsAndPlayers = manager.CurrentTournament.Teams
+                    .GroupJoin(
+                        manager.CurrentTournament.Players,
+                        team => team,
+                        player => player.Team,
+                        (team, players) => new Tuple<Team, IEnumerable<Player>>(team, players));
+
+                // TODO: Look into using an embed. Embeds have 25-field limits, so use newlines in a message for now to
+                // simplify the logic (no message splitting).
+                string[] teamPlayerLines = await Task.WhenAll(teamsAndPlayers
+                    .Select(teamPlayer => GetTeamPlayersLine(context, teamPlayer)));
+                string content = string.Join(Environment.NewLine, teamPlayerLines);
+                await context.Member.SendMessageAsync(content);
+            }
+        }
+
+
         [Command("start")]
         [Description("Starts the current tournament")]
         public async Task Start(CommandContext context)
@@ -683,6 +712,15 @@ namespace QBDiscordAssistant.Discord
             await Task.WhenAll(deleteChannelsTask);
             await Task.WhenAll(deleteRolesTask);
             await UpdateStage(context.Channel, state, TournamentStage.Complete);
+        }
+
+        private static async Task<string> GetTeamPlayersLine(
+            CommandContext context, Tuple<Team, IEnumerable<Player>> teamPlayers)
+        {
+            DiscordMember[] members = await Task.WhenAll(teamPlayers.Item2
+                .Select(player => context.Guild.GetMemberAsync(player.Id)));
+            IEnumerable<string> names = members.Select(member => member.Nickname ?? member.DisplayName);
+            return $"{teamPlayers.Item1.Name}: {string.Join(", ", names)}";
         }
 
         private static string GetTeamRoleName(Team team)

@@ -40,7 +40,6 @@ TODO: Do some refactoring of tournament state to separate individual fields into
   - Consider splitting the state between Discord-specific state and tournament-specific state.
       - Once this is decided, then hide the Discord-specific collections in the state behind methods.
 TODO: Add command to switch readers (may not be needed since you can just assign the role to the user)
-TODO: Add command to list players and the teams they are on (can be DM to the TD)
 TODO: Track member name changes so we can update reader/player names.
 TODO: Be smarter about which channels we delete
 TODO: Add multi-guild support
