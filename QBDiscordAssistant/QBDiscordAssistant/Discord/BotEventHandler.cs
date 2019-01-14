@@ -49,6 +49,7 @@ namespace QBDiscordAssistant.Discord
             Player player = GetPlayerFromReactionEventOrNull(args.User, args.Message.Id, args.Emoji.Name);
             if (player == null)
             {
+                // TODO: we may want to remove the reaction if it's on our team-join messages.
                 return;
             }
 

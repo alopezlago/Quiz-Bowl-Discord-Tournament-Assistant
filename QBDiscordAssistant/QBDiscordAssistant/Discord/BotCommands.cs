@@ -245,7 +245,6 @@ namespace QBDiscordAssistant.Discord
             }
         }
 
-
         [Command("start")]
         [Description("Starts the current tournament")]
         public async Task Start(CommandContext context)
@@ -323,6 +322,84 @@ namespace QBDiscordAssistant.Discord
 
                 TournamentStage previousStage = manager.CurrentTournament.Stage - 1;
                 await UpdateStage(context.Channel, manager.CurrentTournament, previousStage);
+            }
+        }
+
+        [Command("switchreaders")]
+        [Description("Switches the two readers.")]
+        public async Task SwitchReader(
+            CommandContext context,
+            [Description("Old reader to replace (as a @mention).")] DiscordMember oldReaderMember,
+            [Description("New reader (as a @mention).")] DiscordMember newReaderMember)
+        {
+            // TODO: Consider rewriting methods to exit early if we're not in the main channel/have TD privileges.
+            // Alternatively, consider writing an Attribute that does this check for us.
+            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            {
+                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+                if (manager.CurrentTournament == null)
+                {
+                    return;
+                }
+
+                // Only allow this after the tournament has started running
+                if (manager.CurrentTournament.Stage != TournamentStage.RunningPrelims &&
+                    manager.CurrentTournament.Stage != TournamentStage.Finals)
+                {
+                    await context.Member.SendMessageAsync("This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.");
+                    return;
+                }
+
+                DiscordRole oldReaderRole = oldReaderMember.Roles
+                    .FirstOrDefault(role => role.Name.StartsWith(ReaderRoomRolePrefix));
+                if (oldReaderRole == null)
+                {
+                    await context.Member.SendMessageAsync("Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.");
+                    return;
+                }
+
+                if (!manager.CurrentTournament.IsReader(oldReaderMember.Id))
+                {
+                    await context.Member.SendMessageAsync($"{oldReaderMember.Mention} is not a current reader. You can only replace existing readers.");
+                    return;
+                }
+                else if (manager.CurrentTournament.IsReader(newReaderMember.Id))
+                {
+                    await context.Member.SendMessageAsync($"{newReaderMember.Mention} is already a reader. The new reader must not be an existing reader.");
+                    return;
+                }
+
+                if (!manager.CurrentTournament.TryRemoveReader(oldReaderMember.Id))
+                {
+                    await context.Member.SendMessageAsync("Unknown error when trying to remove the old reader.");
+                    return;
+                }
+
+                Reader newReader = new Reader()
+                {
+                    Id = newReaderMember.Id,
+                    Name = newReaderMember.Nickname ?? newReaderMember.DisplayName
+                };
+                if (!manager.CurrentTournament.TryAddReaders(new Reader[] { newReader }))
+                {
+                    await context.Member.SendMessageAsync("Unknown error when trying to add the new reader.");
+                    Reader oldReader = new Reader()
+                    {
+                        Id = oldReaderMember.Id,
+                        Name = oldReaderMember.Nickname ?? oldReaderMember.DisplayName
+                    };
+                    if (!manager.CurrentTournament.TryAddReaders(new Reader[] { oldReader }))
+                    {
+                        await context.Member.SendMessageAsync("Adding back old reader failed. Tournament is now missing a reader. Manually assign that reader's role to the new reader.");
+                        return;
+                    }
+                }
+
+                List<Task> roleChangeTasks = new List<Task>();
+                roleChangeTasks.Add(newReaderMember.GrantRoleAsync(oldReaderRole, "Adding reader role to new reader."));
+                roleChangeTasks.Add(oldReaderMember.RevokeRoleAsync(oldReaderRole, "Removing reader role from oldreader."));
+                await Task.WhenAll(roleChangeTasks);
+                await context.Member.SendMessageAsync("Readers switched successfully.");
             }
         }
 
@@ -491,7 +568,7 @@ namespace QBDiscordAssistant.Discord
             }
 
             DiscordRole directorRole = await AssignDirectorRole(context, state, members);
-            DiscordRole[] roomReaderRoles = await CreateRoomReaderRoles(context, state);
+            DiscordRole[] roomReaderRoles = await AssignRoomReaderRoles(context, state, members);
             Dictionary<Team, DiscordRole> teamRoles = await AssignPlayerRoles(context, state, members);
             TournamentRoles roles = new TournamentRoles()
             {
@@ -612,19 +689,29 @@ namespace QBDiscordAssistant.Discord
             return role;
         }
 
-        private static Task<DiscordRole[]> CreateRoomReaderRoles(CommandContext context, TournamentState state)
+        private static Task<DiscordRole[]> AssignRoomReaderRoles(
+            CommandContext context, TournamentState state, IDictionary<ulong, DiscordMember> members)
         {
             int roomsCount = state.Teams.Count() / 2;
             Task<DiscordRole>[] roomReaderRoleTasks = new Task<DiscordRole>[roomsCount];
+            IEnumerator<Reader> readers = state.Readers.GetEnumerator();
 
-            for (int i = 0; i < roomsCount; i++)
+            for (int i = 0; i < roomsCount && readers.MoveNext(); i++)
             {
-                roomReaderRoleTasks[i] =
-                    context.Guild.CreateRoleAsync(
-                        GetRoomReaderRoleName(i), permissions: PrivilegedPermissions, color: DiscordColor.LightGray);
+                roomReaderRoleTasks[i] = AssignRoomReaderRole(
+                    context, GetRoomReaderRoleName(i), readers.Current.Id, members);
             }
 
             return Task.WhenAll(roomReaderRoleTasks);
+        }
+
+        private static async Task<DiscordRole> AssignRoomReaderRole(
+            CommandContext context, string roleName, ulong readerId, IDictionary<ulong, DiscordMember> members)
+        {
+            DiscordRole role = await context.Guild.CreateRoleAsync(
+                roleName, permissions: PrivilegedPermissions, color: DiscordColor.Azure);
+            await members[readerId].GrantRoleAsync(role, "Assigning reader role.");
+            return role;
         }
 
         // TODO: Pass in the parent channel (category channel)

@@ -93,6 +93,11 @@ namespace QBDiscordAssistant.Tournament
             return this.directorIds.Remove(directorId);
         }
 
+        public bool TryRemoveReader(ulong readerId)
+        {
+            return this.readers.Remove(readerId);
+        }
+
         public bool IsDirector(ulong directorId)
         {
             return this.directorIds.Contains(directorId);
