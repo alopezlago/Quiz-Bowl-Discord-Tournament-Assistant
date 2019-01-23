@@ -4,67 +4,37 @@ using System.Globalization;
 
 namespace QBDiscordAssistant.Tournament
 {
-    public class TournamentState
+    public class TournamentState : ITournamentState
     {
         // TODO: see if there's a better place for this
         public const int MaxRoundRobins = 5;
 
-        private HashSet<ulong> directorIds;
-        private Dictionary<ulong, Player> players;
-        private Dictionary<ulong, Reader> readers;
-        private Dictionary<string, Team> teams;
+        private readonly HashSet<ulong> directorIds;
+        private readonly Dictionary<ulong, Player> players;
+        private readonly Dictionary<ulong, Reader> readers;
+        private readonly Dictionary<string, Team> teams;
 
-        public TournamentState()
+        public TournamentState(ulong guildId, string name)
         {
             this.directorIds = new HashSet<ulong>();
             this.players = new Dictionary<ulong, Player>();
             this.teams = new Dictionary<string, Team>();
             this.readers = new Dictionary<ulong, Reader>();
-            this.SymbolToTeam = new Dictionary<string, Team>();
-            this.TeamRoleIds = new Dictionary<Team, ulong>();
-            this.JoinTeamMessageIds = new HashSet<ulong>();
+
+            this.GuildId = guildId;
+            this.Name = name;
+            this.AddPlayersState = new AddPlayersState();
         }
 
-        // TODO: State is too spread out, is unsynchronized while being used in async methods, and collections  are too
-        // accessible. We need to do the following:
-        // - Hide the collections behind methods; we don't usually need direct access to them, we just need to do these
-        //   3 ops: add, remove, contains. Sometimes we need to Select/project.
-        //   - We should hide the Discord-specific state in a separate change because we might move them behind another
-        //     class, and they don't have the same synchronization issue.
-        // - Lock access to the collections, especially DirectorIds and Players since they're not done in one shot. We
-        //   may want to look ininto Concurrent versions of the collections.
-        //   - Highest priority is DirectorIds and Players since those are more easily contested, but we could have
-        //     multiple TDs setting up the tournament, so we should lock the others (and reject those which are late)
-        // - Move the Discord-specific state (GuildId, XRoleIds, SymbolToTeam, JoinTeamMessageIds) to their own classes
-        //   - Need to consider whether to split this into two pieces (TournamentState and DiscordState), into two
-        //     separate classes under this one, or to keep the fields here and add DiscordState as another one.
-        //   - This might just be organizing for the sake of organizing: it might make sense to split it once we start
-        //     doing more automation (i.e. passing tournament-specific state to those classes instead of including 
-        //     unrelated Discord stuff), but we may want to wait until we need those changes.
-        //      - The one benefit might be to make the Discord class an interface, and have this implementation take
-        //        a client, so that it can create the roles on itself, and we just need to call a method to initialize
-        //        the roles (and get access to the role or role IDs).
-
         // Name acts as an ID
-        public string Name { get; set; }
+        public string Name { get; }
 
-        // TODO: Need to gate commands and events based on this. Otherwise tournament state can be modified on other
-        // servers.
-        // TODO: This should arguably be a readonly field that's passed into the constructor. We could have a
-        // TournamentStateBuilder that adds Name/GuildId and then creates this class. Alternatively, we keep the builder
-        // around until we're ready to start the tournament.
-        public ulong GuildId { get; set; }
+        public ulong GuildId { get; }
 
-        // TODO: Group this in a class (maybe TournamentRoleIds)
-        public ulong DirectorRoleId { get; set; }
-
-        public ulong[] ReaderRoomRoleIds { get; set; }
-
-        public Dictionary<Team, ulong> TeamRoleIds { get; set; }
+        public TournamentRoleIds TournamentRoles { get; set; }
 
         public IEnumerable<ulong> DirectorIds => this.directorIds;
 
-        // TODO: We should hide this value behind a lock.
         public TournamentStage Stage { get; private set; }
 
         public IEnumerable<Player> Players => this.players.Values;
@@ -73,12 +43,12 @@ namespace QBDiscordAssistant.Tournament
 
         public IEnumerable<Reader> Readers => this.readers.Values;
 
-        public IDictionary<string, Team> SymbolToTeam { get; private set; }
-
-        public ISet<ulong> JoinTeamMessageIds { get; private set; }
+        public IEnumerable<ulong> JoinTeamMessageIds => this.AddPlayersState.JoinTeamMessageIds;
 
         // This should influence Schedule... leaving it here for now, but maybe it should moved to Schedule
         public int RoundRobinsCount { get; set; }
+
+        private AddPlayersState AddPlayersState { get; }
 
         // TODO: Make ISchedule?
         public Schedule Schedule { get; set; }
@@ -101,6 +71,21 @@ namespace QBDiscordAssistant.Tournament
         public bool IsDirector(ulong directorId)
         {
             return this.directorIds.Contains(directorId);
+        }
+
+        public void AddJoinTeamMessageId(ulong messageId)
+        {
+            this.AddPlayersState.JoinTeamMessageIds.Add(messageId);
+        }
+
+        public void ClearJoinTeamMessageIds()
+        {
+            this.AddPlayersState.JoinTeamMessageIds.Clear();
+        }
+
+        public bool IsJoinTeamMessage(ulong messageId)
+        {
+            return this.AddPlayersState.JoinTeamMessageIds.Contains(messageId);
         }
 
         /// <summary>
@@ -127,7 +112,7 @@ namespace QBDiscordAssistant.Tournament
         public bool TryGetPlayerTeam(ulong playerId, out Team team)
         {
             team = null;
-            if (this.players.TryGetValue(playerId, out Player player))
+            if (!this.players.TryGetValue(playerId, out Player player))
             {
                 return false;
             }
@@ -136,14 +121,12 @@ namespace QBDiscordAssistant.Tournament
             return true;
         }
 
-        public bool TryAddReaders(IEnumerable<Reader> readers)
+        public void AddReaders(IEnumerable<Reader> readers)
         {
             foreach (Reader reader in readers)
             {
                 this.readers[reader.Id] = reader;
             }
-
-            return true;
         }
 
         public bool TryClearReaders()
@@ -162,14 +145,27 @@ namespace QBDiscordAssistant.Tournament
             return this.readers.ContainsKey(readerId);
         }
 
-        public bool TryAddTeams(IEnumerable<Team> teams)
+        public void AddSymbolToTeam(string symbol, Team team)
+        {
+            this.AddPlayersState.SymbolToTeam.Add(symbol, team);
+        }
+
+        public void ClearSymbolsToTeam()
+        {
+            this.AddPlayersState.SymbolToTeam.Clear();
+        }
+
+        public bool TryGetTeamFromSymbol(string symbol, out Team team)
+        {
+            return this.AddPlayersState.SymbolToTeam.TryGetValue(symbol, out team);
+        }
+
+        public void AddTeams(IEnumerable<Team> teams)
         {
             foreach (Team team in teams)
             {
                 this.teams[team.Name] = team;
             }
-
-            return true;
         }
 
         public bool TryClearTeams()
@@ -178,7 +174,7 @@ namespace QBDiscordAssistant.Tournament
             return true;
         }
 
-        public bool TryGetTeam(string teamName, out Team team)
+        public bool TryGetTeamFromName(string teamName, out Team team)
         {
             return this.teams.TryGetValue(teamName, out team);
         }

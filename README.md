@@ -35,12 +35,11 @@ Starting a tournament:
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
 
 
-TODO: Do some refactoring of tournament state to separate individual fields into more explainable components. Specifically:
-  - Make the state thread-safe, which requires using concurrent collections and locking.
-  - Consider splitting the state between Discord-specific state and tournament-specific state.
-      - Once this is decided, then hide the Discord-specific collections in the state behind methods.
+TODO: Rewrite command methods to exit early on ifs to improve readability. Alternatively, create attribute classes to do this and use those attributes.
 TODO: Track member name changes so we can update reader/player names.
 TODO: Be smarter about which channels we delete
+TODO: Add voice channels to a category
+TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier.
 TODO: Add multi-guild support
 TODO: Write guide for how to start a tournament as a TD
 TODO: Add persistence of tournaments

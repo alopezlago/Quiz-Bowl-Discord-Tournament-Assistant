@@ -46,38 +46,56 @@ namespace QBDiscordAssistant.Discord
 
         public async Task OnReactionAdded(MessageReactionAddEventArgs args)
         {
-            Player player = GetPlayerFromReactionEventOrNull(args.User, args.Message.Id, args.Emoji.Name);
-            if (player == null)
+            if (args.User.IsCurrent)
             {
-                // TODO: we may want to remove the reaction if it's on our team-join messages.
+                // Ignore the bot's own additions
                 return;
             }
 
             DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.User.Id);
 
-            // Because player equality/hashing is only based on the ID, we can check if the player is in the set with
-            // the new instance.
-            if (!this.manager.CurrentTournament.TryAddPlayer(player))
+            Player player = null;
+            bool playerAdded = false;
+            bool attempt = this.manager.TryReadWriteActionOnCurrentTournament(currentTournament =>
+            {
+                player = GetPlayerFromReactionEventOrNull(
+                    currentTournament, args.User, args.Message.Id, args.Emoji.Name);
+                if (player == null)
+                {
+                    // TODO: we may want to remove the reaction if it's on our team-join messages.
+                    return;
+                }
+
+                // Because player equality/hashing is only based on the ID, we can check if the player is in the set with
+                // the new instance.
+                playerAdded = currentTournament.TryAddPlayer(player);
+            });
+
+            if (!(attempt && playerAdded))
             {
                 // TODO: We should remove the reaction they gave instead of this one (this may also require the manage
                 // emojis permission?). This would also require a map from userIds/Players to emojis in the tournament
                 // state. The Reactions collection doesn't have information on who added it, and iterating through each
                 // emoji to see if the user was there would be slow.
                 Task deleteReactionTask = args.Message.DeleteReactionAsync(args.Emoji, args.User);
-                Task sendMessageTask = member.SendMessageAsync(
-                    "You are already on a team. Click on the emoji of the team you were on to leave that team, then click on the emoji of the team you want to join.");
+                string message = attempt ?
+                    "You are already on a team. Click on the emoji of the team you were on to leave that team, then click on the emoji of the team you want to join." :
+                    "We were unable to add you to the team. Try again.";
+                Task sendMessageTask = member.SendMessageAsync(message);
                 await Task.WhenAll(deleteReactionTask, sendMessageTask);
                 return;
             }
-
-            await member.SendMessageAsync($"You have joined the team {player.Team.Name}");
+            else if (player != null)
+            {
+                await member.SendMessageAsync($"You have joined the team {player.Team.Name}");
+            }
         }
 
         public async Task OnReactionRemoved(MessageReactionRemoveEventArgs args)
         {
-            Player player = GetPlayerFromReactionEventOrNull(args.User, args.Message.Id, args.Emoji.Name);
-            if (player == null)
+            if (args.User.IsCurrent)
             {
+                // Ignore the bot's own additions
                 return;
             }
 
@@ -88,53 +106,91 @@ namespace QBDiscordAssistant.Discord
             // we're removing from the set has the same team as the emoji maps to.
             // TODO: We may want to make this a dictionary of IDs to Players to make this operation efficient. We could
             // use ContainsKey to do the contains checks efficiently.
-            if (this.manager.CurrentTournament.TryGetPlayerTeam(args.User.Id, out Team storedTeam) &&
-                storedTeam == player.Team &&
-                this.manager.CurrentTournament.TryRemovePlayer(args.User.Id))
-            {
-                DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.User.Id);
-                await member.SendMessageAsync($"You have left the team {player.Team.Name}");
-            }
+            DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.User.Id);
+            await this.manager.DoReadWriteActionOnCurrentTournamentForMember(
+                member,
+                async currentTournament =>
+                {
+                    Player player = GetPlayerFromReactionEventOrNull(
+                        currentTournament, args.User, args.Message.Id, args.Emoji.Name);
+                    if (player == null)
+                    {
+                        return;
+                    }
+
+                    if (currentTournament.TryGetPlayerTeam(args.User.Id, out Team storedTeam) &&
+                        storedTeam == player.Team &&
+                        currentTournament.TryRemovePlayer(args.User.Id))
+                    {
+                        await member.SendMessageAsync($"You have left the team {player.Team.Name}");
+                    }
+                });
         }
 
         public async Task OnMessageCreated(MessageCreateEventArgs args)
         {
-            if (args.Author.IsCurrent ||
-                this.manager.CurrentTournament == null)
-            {
-                return;
-            }
-
             if (args.Message.Content.TrimStart().StartsWith("!"))
             {
                 // Ignore commands
                 return;
             }
 
-            DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.Author.Id);
-            if (!this.HasTournamentDirectorPrivileges(args.Channel, member))
+            if (args.Author.IsCurrent)
             {
                 return;
             }
 
-            // TODO: We need to have locks on these. Need to check the stages between locks, and ignore the message if
-            // it changes.
-            // Issue is that we should really rely on a command for this case. Wouldn't quite work with locks.
-            // But that would be something like !start, which would stop the rest of the interaction.
-            switch (this.manager.CurrentTournament.Stage)
+            // TODO: See if there's a cheaper way to check if we have a current tournament without making it public.
+            // This is a read-only lock, so it shouldn't be too bad, but it'll be blocked during write operations.
+            // Don't use the helper method because we don't want to message the user each time if there's no tournament.
+            // We also want to split this check and the TD check because we don't need to get the Discord member for
+            // this check.
+            Result<bool> currentTournamentExists = this.manager.TryReadActionOnCurrentTournament(currentTournament => true);
+            if (!currentTournamentExists.Success)
             {
-                case TournamentStage.AddReaders:
-                    await this.HandleAddReadersStage(args);
-                    break;
-                case TournamentStage.SetRoundRobins:
-                    await this.HandleSetRoundRobinsStage(args);
-                    break;
-                case TournamentStage.AddTeams:
-                    await this.HandleAddTeamsStage(args);
-                    break;
-                default:
-                    break;
+                return;
             }
+
+            // We want to do the basic access checks before using the more expensive write lock.
+            DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.Author.Id);
+            Result<bool> hasDirectorPrivileges = this.manager.TryReadActionOnCurrentTournament(
+                currentTournament => HasTournamentDirectorPrivileges(currentTournament, args.Channel, member));
+            if (!(hasDirectorPrivileges.Success && hasDirectorPrivileges.Value))
+            {
+                return;
+            }
+
+            await this.manager.DoReadWriteActionOnCurrentTournamentForMember(
+                member,
+                async currentTournament =>
+                {
+                    // TODO: We need to have locks on these. Need to check the stages between locks, and ignore the message if
+                    // it changes.
+                    // Issue is that we should really rely on a command for this case. Wouldn't quite work with locks.
+                    // But that would be something like !start, which would stop the rest of the interaction.
+                    switch (currentTournament.Stage)
+                    {
+                        case TournamentStage.AddReaders:
+                            await this.HandleAddReadersStage(currentTournament, args);
+                            break;
+                        case TournamentStage.SetRoundRobins:
+                            await this.HandleSetRoundRobinsStage(currentTournament, args);
+                            break;
+                        case TournamentStage.AddTeams:
+                            await this.HandleAddTeamsStage(currentTournament, args);
+                            break;
+                        default:
+                            break;
+                    }
+                });
+        }
+
+        private static bool HasTournamentDirectorPrivileges(
+            IReadOnlyTournamentState currentTournament, DiscordChannel channel, DiscordMember member)
+        {
+            // TD is only allowed to run commands when they are a director of the current tournament.
+            return currentTournament.GuildId == channel.GuildId &&
+                (IsAdminUser(channel, member) || currentTournament.IsDirector(member.Id));
         }
 
         private static bool IsAdminUser(DiscordChannel channel, DiscordMember member)
@@ -184,15 +240,7 @@ namespace QBDiscordAssistant.Discord
             return true;
         }
 
-        private bool HasTournamentDirectorPrivileges(DiscordChannel channel, DiscordMember member)
-        {
-            // TD is only allowed to run commands when they are a director of the current tournament.
-            return this.manager.CurrentTournament != null &&
-                manager.CurrentTournament.GuildId == channel.GuildId &&
-                (IsAdminUser(channel, member) || manager.CurrentTournament.IsDirector(member.Id));
-        }
-
-        private async Task HandleAddReadersStage(MessageCreateEventArgs args)
+        private async Task HandleAddReadersStage(ITournamentState currentTournament, MessageCreateEventArgs args)
         {
             IEnumerable<Task<DiscordMember>> getReaderMembers = args.MentionedUsers
                 .Select(user => args.Guild.GetMemberAsync(user.Id));
@@ -203,26 +251,19 @@ namespace QBDiscordAssistant.Discord
                 Name = member.Nickname ?? member.DisplayName
             });
 
-            // TODO: Need to determine if we want any messaging here
-            if (!this.manager.CurrentTournament.TryAddReaders(readers))
-            {
-                DiscordMember member = await args.Guild.GetMemberAsync(args.Author.Id);
-                await member.SendMessageAsync("Somebody else has already added readers.");
-                return;
-            }
-
-            if (!this.manager.CurrentTournament.Readers.Any())
+            currentTournament.AddReaders(readers);
+            if (!currentTournament.Readers.Any())
             {
                 await args.Channel.SendMessageAsync("No readers added. There must be at least one reader for a tournament.");
                 return;
             }
 
             await args.Channel.SendMessageAsync(
-                $"{this.manager.CurrentTournament.Readers.Count()} readers total for the tournament.");
-            await this.UpdateStage(args.Channel, TournamentStage.SetRoundRobins);
+                $"{currentTournament.Readers.Count()} readers total for the tournament.");
+            await this.UpdateStage(currentTournament, TournamentStage.SetRoundRobins, args.Channel);
         }
 
-        private async Task HandleSetRoundRobinsStage(MessageCreateEventArgs args)
+        private async Task HandleSetRoundRobinsStage(ITournamentState currentTournament, MessageCreateEventArgs args)
         {
             if (!int.TryParse(args.Message.Content, out int rounds))
             {
@@ -234,11 +275,11 @@ namespace QBDiscordAssistant.Discord
                 return;
             }
 
-            this.manager.CurrentTournament.RoundRobinsCount = rounds;
-            await this.UpdateStage(args.Channel, TournamentStage.AddTeams);
+            currentTournament.RoundRobinsCount = rounds;
+            await this.UpdateStage(currentTournament, TournamentStage.AddTeams, args.Channel);
         }
 
-        private async Task HandleAddTeamsStage(MessageCreateEventArgs args)
+        private async Task HandleAddTeamsStage(ITournamentState currentTournament, MessageCreateEventArgs args)
         {
             if (!TeamNameParser.TryGetTeamNamesFromParts(
                 args.Message.Content, out HashSet<string> teamNames, out string errorMessage))
@@ -252,24 +293,19 @@ namespace QBDiscordAssistant.Discord
                 {
                     Name = name
                 });
-            if (!this.manager.CurrentTournament.TryAddTeams(newTeams))
-            {
-                DiscordMember member = await args.Guild.GetMemberAsync(args.Author.Id);
-                await member.SendMessageAsync("Teams have already been added.");
-                return;
-            }
+            currentTournament.AddTeams(newTeams);
 
-            int teamsCount = this.manager.CurrentTournament.Teams.Count();
+            int teamsCount = currentTournament.Teams.Count();
             if (teamsCount < 2)
             {
                 await args.Channel.SendMessageAsync("There must be at least two teams for a tournament. Specify more teams.");
                 return;
             }
 
-            int maxTeamsCount = this.GetMaximumTeamCount();
+            int maxTeamsCount = this.GetMaximumTeamCount(currentTournament);
             if (teamsCount > maxTeamsCount)
             {
-                this.manager.CurrentTournament.TryClearTeams();
+                currentTournament.TryClearTeams();
                 await args.Channel.SendMessageAsync(
                     $"There are too many teams. This bot can only handle {maxTeamsCount}-team tournaments. None of the teams have been added.");
                 return;
@@ -278,15 +314,15 @@ namespace QBDiscordAssistant.Discord
             if (!TryGetEmojis(this.client, teamsCount, out DiscordEmoji[] emojis, out errorMessage))
             {
                 // Something very strange has happened. Undo the addition and tell the user.
-                this.manager.CurrentTournament.TryClearTeams();
+                currentTournament.TryClearTeams();
                 await args.Channel.SendMessageAsync(
                     $"Unexpected failure adding teams: '{errorMessage}'. None of the teams have been added.");
                 return;
             }
 
-            await this.UpdateStage(args.Channel, TournamentStage.AddPlayers);
+            await this.UpdateStage(currentTournament, TournamentStage.AddPlayers, args.Channel);
 
-            this.manager.CurrentTournament.SymbolToTeam.Clear();
+            currentTournament.ClearSymbolsToTeam();
             int emojiIndex = 0;
             Debug.Assert(
                 emojis.Length == teamsCount,
@@ -297,7 +333,7 @@ namespace QBDiscordAssistant.Discord
             // maxFieldSize is an inclusive limit, so we need to include the - 1 to make add a new slot only
             // when that limit is exceeded.
             int addPlayersEmbedsCount = 1 + (teamsCount - 1) / MaxTeamsInMessage;
-            IEnumerator<Team> teamsEnumerator = this.manager.CurrentTournament.Teams.GetEnumerator();
+            IEnumerator<Team> teamsEnumerator = currentTournament.Teams.GetEnumerator();
             List<Task> addReactionsTasks = new List<Task>();
             for (int i = 0; i < addPlayersEmbedsCount; i++)
             {
@@ -312,7 +348,7 @@ namespace QBDiscordAssistant.Discord
                     emojisForMessage.Add(emoji);
                     Team team = teamsEnumerator.Current;
                     embedBuilder.AddField(emoji.Name, team.Name);
-                    this.manager.CurrentTournament.SymbolToTeam.Add(emoji.Name, team);
+                    currentTournament.AddSymbolToTeam(emoji.Name, team);
 
                     fieldCount++;
                     emojiIndex++;
@@ -321,45 +357,47 @@ namespace QBDiscordAssistant.Discord
                 // We should generally avoid await inside of loops, but we want the messages and emojis to be
                 // in order.
                 DiscordMessage message = await args.Channel.SendMessageAsync(embed: embedBuilder.Build());
-                this.manager.CurrentTournament.JoinTeamMessageIds.Add(message.Id);
-                addReactionsTasks.Add(this.AddReactionsToMessage(message, emojisForMessage));
+                currentTournament.AddJoinTeamMessageId(message.Id);
+                addReactionsTasks.Add(this.AddReactionsToMessage(message, emojisForMessage, currentTournament));
             }
 
             await Task.WhenAll(addReactionsTasks);
         }
 
-        private async Task AddReactionsToMessage(DiscordMessage message, IEnumerable<DiscordEmoji> emojisForMessage)
+        private async Task AddReactionsToMessage(
+            DiscordMessage message, IEnumerable<DiscordEmoji> emojisForMessage, ITournamentState currentTournament)
         {
-            this.manager.CurrentTournament.JoinTeamMessageIds.Add(message.Id);
+            currentTournament.AddJoinTeamMessageId(message.Id);
             foreach (DiscordEmoji emoji in emojisForMessage)
             {
                 await message.CreateReactionAsync(emoji);
             }
         }
 
-        private int GetMaximumTeamCount()
+        private int GetMaximumTeamCount(IReadOnlyTournamentState currentTournament)
         {
-            return this.manager.CurrentTournament.Readers.Count() * 2 + 1;
+            return currentTournament.Readers.Count() * 2 + 1;
         }
 
-        private Player GetPlayerFromReactionEventOrNull(DiscordUser user, ulong messageId, string emojiName)
+        private Player GetPlayerFromReactionEventOrNull(
+            IReadOnlyTournamentState currentTournament, DiscordUser user, ulong messageId, string emojiName)
         {
             // TODO: since we have the message ID it's unlikely we need to verify the guild, but we should double check.
             if (user.IsCurrent ||
-                this.manager.CurrentTournament == null ||
-                !this.manager.CurrentTournament.JoinTeamMessageIds.Contains(messageId) ||
-                !this.manager.CurrentTournament.SymbolToTeam.TryGetValue(emojiName, out Team team))
+                currentTournament == null ||
+                !currentTournament.IsJoinTeamMessage(messageId) ||
+                !currentTournament.TryGetTeamFromSymbol(emojiName, out Team team))
             {
                 return null;
             }
 
             ulong userId = user.Id;
-            if (this.manager.CurrentTournament.IsDirector(userId))
+            if (currentTournament.IsDirector(userId))
             {
                 return null;
             }
 
-            if (this.manager.CurrentTournament.IsReader(userId))
+            if (currentTournament.IsReader(userId))
             {
                 return null;
             }
@@ -372,9 +410,9 @@ namespace QBDiscordAssistant.Discord
             return player;
         }
 
-        private async Task UpdateStage(DiscordChannel channel, TournamentStage stage)
+        private async Task UpdateStage(ITournamentState tournament, TournamentStage stage, DiscordChannel channel)
         {
-            this.manager.CurrentTournament.UpdateStage(stage, out string title, out string instructions);
+            tournament.UpdateStage(stage, out string title, out string instructions);
             if (title == null && instructions == null)
             {
                 return;
