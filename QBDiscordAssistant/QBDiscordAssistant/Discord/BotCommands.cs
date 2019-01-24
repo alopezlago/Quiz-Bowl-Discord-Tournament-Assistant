@@ -629,9 +629,11 @@ namespace QBDiscordAssistant.Discord
             Debug.Assert(firstRound.Games.Select(game => game.Reader.Name).Count() ==
                 firstRound.Games.Select(game => game.Reader.Name).Distinct().Count(),
                 "All reader names should be unique.");
+            DiscordChannel voiceCategoryChannel = await context.Guild.CreateChannelAsync(
+                "Readers", ChannelType.Category);
             foreach (Game game in firstRound.Games)
             {
-                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, roles, game.Reader));
+                createVoiceChannelsTasks.Add(CreateVoiceChannel(context, voiceCategoryChannel, roles, game.Reader));
             }
 
             await Task.WhenAll(createVoiceChannelsTasks);
@@ -665,10 +667,10 @@ namespace QBDiscordAssistant.Discord
         }
 
         private static async Task<DiscordChannel> CreateVoiceChannel(
-            CommandContext context, TournamentRoles roles, Reader reader)
+            CommandContext context, DiscordChannel parent, TournamentRoles roles, Reader reader)
         {
             string name = GetVoiceRoomName(reader);
-            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice);
+            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice, parent);
             return channel;
         }
 

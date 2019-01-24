@@ -168,6 +168,14 @@ namespace QBDiscordAssistant.Tournament
             }
         }
 
+        public void RemoveTeams(IEnumerable<Team> teams)
+        {
+            foreach (Team team in teams)
+            {
+                this.teams.Remove(team.Name);
+            }
+        }
+
         public bool TryClearTeams()
         {
             this.teams.Clear();

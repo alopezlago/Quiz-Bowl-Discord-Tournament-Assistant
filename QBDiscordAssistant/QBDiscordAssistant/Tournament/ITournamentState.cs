@@ -16,6 +16,7 @@ namespace QBDiscordAssistant.Tournament
         bool TryAddPlayer(Player player);
         void AddReaders(IEnumerable<Reader> readers);
         void AddTeams(IEnumerable<Team> teams);
+        void RemoveTeams(IEnumerable<Team> teams);
         bool TryClearReaders();
         bool TryClearTeams();
         bool TryRemoveDirector(ulong directorId);

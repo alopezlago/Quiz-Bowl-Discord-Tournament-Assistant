@@ -299,6 +299,7 @@ namespace QBDiscordAssistant.Discord
             if (teamsCount < 2)
             {
                 await args.Channel.SendMessageAsync("There must be at least two teams for a tournament. Specify more teams.");
+                currentTournament.RemoveTeams(newTeams);
                 return;
             }
 
