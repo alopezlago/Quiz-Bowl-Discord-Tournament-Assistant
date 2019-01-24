@@ -44,34 +44,32 @@ namespace QBDiscordAssistant.Discord
             [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
             [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
-            if (IsMainChannel(context) && tournamentNameParts.Length > 0)
+            if (!IsMainChannel(context) || tournamentNameParts.Length == 0)
             {
-                string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                ITournamentState state = new TournamentState(context.Guild.Id, tournamentName);
-                bool updateSuccessful = state.TryAddDirector(newDirector.Id);
-
-                manager.AddOrUpdateTournament(
-                    tournamentName,
-                    new TournamentState(context.Guild.Id, tournamentName), (name, tournamentState) =>
-                    {
-                        updateSuccessful = tournamentState.TryAddDirector(newDirector.Id);
-                        return tournamentState;
-                    });
-
-                // TODO: Need to handle this differently depending on the stage. Completed shouldn't do anything, and
-                // after RoleSetup we should give them the TD role.
-                if (updateSuccessful)
-                {
-                    return context.Member.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
-                }
-                else
-                {
-                    return context.Member.SendMessageAsync($"User is already a director of '{tournamentName}'.");
-                }
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            string tournamentName = string.Join(" ", tournamentNameParts).Trim();
+            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            ITournamentState state = new TournamentState(context.Guild.Id, tournamentName);
+            bool updateSuccessful = state.TryAddDirector(newDirector.Id);
+
+            manager.AddOrUpdateTournament(
+                tournamentName,
+                new TournamentState(context.Guild.Id, tournamentName), (name, tournamentState) =>
+                {
+                    updateSuccessful = tournamentState.TryAddDirector(newDirector.Id);
+                    return tournamentState;
+                });
+
+            // TODO: Need to handle this differently depending on the stage. Completed shouldn't do anything, and
+            // after RoleSetup we should give them the TD role.
+            if (updateSuccessful)
+            {
+                return context.Member.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
+            }
+
+            return context.Member.SendMessageAsync($"User is already a director of '{tournamentName}'.");
         }
 
         [Command("removeTD")]
@@ -83,45 +81,45 @@ namespace QBDiscordAssistant.Discord
             [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
             [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
-            if (IsMainChannel(context))
+            if (!IsMainChannel(context))
             {
-                string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-
-                // TODO: Harden this. Since it's not guaranteed to be the current tournament, we can't use the helper
-                // methods
-                if (manager.TryGetTournament(tournamentName, out ITournamentState state))
-                {
-                    if (state.TryRemoveDirector(newDirector.Id))
-                    {
-                        return context.Channel.SendMessageAsync(
-                            $"Removed tournament director from tournament '{tournamentName}'.");
-                    }
-                    else
-                    {
-                        return context.Channel.SendMessageAsync(
-                           $"User is not a director for tournament '{tournamentName}', or user was just removed.");
-                    }
-                }
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            string tournamentName = string.Join(" ", tournamentNameParts).Trim();
+            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+
+            // TODO: Harden this. Since it's not guaranteed to be the current tournament, we can't use the helper
+            // methods
+            if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
+            {
+                return Task.CompletedTask;
+            }
+
+            if (state.TryRemoveDirector(newDirector.Id))
+            {
+                return context.Channel.SendMessageAsync(
+                    $"Removed tournament director from tournament '{tournamentName}'.");
+            }
+
+            return context.Channel.SendMessageAsync(
+                $"User is not a director for tournament '{tournamentName}', or user was just removed.");
         }
 
         [Command("getCurrentTournament")]
         [Description("Gets the name of the current tournament, if it exists.")]
         public Task GetCurrentTournament(CommandContext context)
         {
-            if (IsMainChannel(context))
+            if (!IsMainChannel(context))
             {
-                // DoReadActionOnCurrentTournament will not run the action if the tournament is null. It'll send an
-                // error message to the user instead.
-                return DoReadActionOnCurrentTournament(context,
-                    currentTournament =>
-                        context.Channel.SendMessageAsync($"Current tournament: {currentTournament.Name}"));
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            // DoReadActionOnCurrentTournament will not run the action if the tournament is null. It'll send an
+            // error message to the user instead.
+            return DoReadActionOnCurrentTournament(
+                context,
+                currentTournament => context.Channel.SendMessageAsync($"Current tournament: {currentTournament.Name}"));
         }
 
         [Command("setup")]
@@ -167,37 +165,36 @@ namespace QBDiscordAssistant.Discord
             [Description("Member to add as the player (as a @mention).")] DiscordMember member,
             [Description("Team name.")] params string[] rawTeamNameParts)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                string teamName = string.Join(" ", rawTeamNameParts).Trim();
-                return DoReadWriteActionOnCurrentTournament(
-                    context,
-                    currentTournament =>
+                return Task.CompletedTask;
+            }
+
+            string teamName = string.Join(" ", rawTeamNameParts).Trim();
+            return DoReadWriteActionOnCurrentTournament(
+                context,
+                currentTournament =>
+                {
+                    if (currentTournament.TryGetTeamFromName(teamName, out Team team))
                     {
-                        if (currentTournament.TryGetTeamFromName(teamName, out Team team))
+                        Player player = new Player()
                         {
-                            Player player = new Player()
-                            {
-                                Id = member.Id,
-                                Team = team
-                            };
-                            if (currentTournament.TryAddPlayer(player))
-                            {
-                                return context.Member.SendMessageAsync($"Player {member.Mention} added to team '{teamName}'.");
-                            }
-                            else
-                            {
-                                return context.Member.SendMessageAsync($"Player {member.Mention} is already on a team.");
-                            }
+                            Id = member.Id,
+                            Team = team
+                        };
+                        if (currentTournament.TryAddPlayer(player))
+                        {
+                            return context.Member.SendMessageAsync($"Player {member.Mention} added to team '{teamName}'.");
                         }
                         else
                         {
-                            return context.Member.SendMessageAsync($"Team '{teamName}' does not exist.");
+                            return context.Member.SendMessageAsync($"Player {member.Mention} is already on a team.");
                         }
-                    });
-            }
+                    }
 
-            return Task.CompletedTask;
+
+                    return context.Member.SendMessageAsync($"Team '{teamName}' does not exist.");
+                });
         }
 
         [Command("removePlayer")]
@@ -206,95 +203,99 @@ namespace QBDiscordAssistant.Discord
             CommandContext context,
             [Description("Member to add as the player (as a @mention).")] DiscordMember member)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                return DoReadWriteActionOnCurrentTournament(
-                    context,
-                    currentTournament =>
-                    {
-                        if (currentTournament.TryRemovePlayer(member.Id))
-                        {
-                            return context.Member.SendMessageAsync($"Player {member.Mention} removed.");
-                        }
-                        else
-                        {
-                            return context.Member.SendMessageAsync($"Player {member.Mention} is not on any team.");
-                        }
-                    });
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            return DoReadWriteActionOnCurrentTournament(
+                context,
+                currentTournament =>
+                {
+                    if (currentTournament.TryRemovePlayer(member.Id))
+                    {
+                        return context.Member.SendMessageAsync($"Player {member.Mention} removed.");
+                    }
+
+                    return context.Member.SendMessageAsync($"Player {member.Mention} is not on any team.");
+                });
         }
 
         [Command("getPlayers")]
         [Description("Gets the players in the current tournament, grouped by their team.")]
         public async Task GetPlayers(CommandContext context)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                IEnumerable<Tuple<Team, IEnumerable<Player>>> teamsAndPlayers = null;
-                await DoReadActionOnCurrentTournament(
-                    context,
-                    currentTournament =>
-                    {
-                        teamsAndPlayers = currentTournament.Teams
-                            .GroupJoin(
-                                currentTournament.Players,
-                                team => team,
-                                player => player.Team,
-                                (team, players) => new Tuple<Team, IEnumerable<Player>>(team, players));
-                        return Task.CompletedTask;
-                    });
-
-                if (teamsAndPlayers != null)
-                {
-                    // TODO: Look into using an embed. Embeds have 25-field limits, so use newlines in a message
-                    // for now to simplify the logic (no message splitting).
-                    string[] teamPlayerLines = await Task.WhenAll(teamsAndPlayers
-                        .Select(teamPlayer => GetTeamPlayersLine(context, teamPlayer)));
-                    string content = string.Join(Environment.NewLine, teamPlayerLines);
-                    await context.Member.SendMessageAsync(content);
-                }
+                return;
             }
+
+            IEnumerable<Tuple<Team, IEnumerable<Player>>> teamsAndPlayers = null;
+            await DoReadActionOnCurrentTournament(
+                context,
+                currentTournament =>
+                {
+                    teamsAndPlayers = currentTournament.Teams
+                        .GroupJoin(
+                            currentTournament.Players,
+                            team => team,
+                            player => player.Team,
+                            (team, players) => new Tuple<Team, IEnumerable<Player>>(team, players));
+                    return Task.CompletedTask;
+                });
+
+            if (teamsAndPlayers == null)
+            {
+                return;
+            }
+
+            // TODO: Look into using an embed. Embeds have 25-field limits, so use newlines in a message
+            // for now to simplify the logic (no message splitting).
+            string[] teamPlayerLines = await Task.WhenAll(teamsAndPlayers
+                .Select(teamPlayer => GetTeamPlayersLine(context, teamPlayer)));
+            string content = string.Join(Environment.NewLine, teamPlayerLines);
+            await context.Member.SendMessageAsync(content);
         }
 
         [Command("start")]
         [Description("Starts the current tournament")]
         public async Task Start(CommandContext context)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                bool startSucceeded = false;
-                await DoReadWriteActionOnCurrentTournament(
-                    context,
-                    async currentTournament =>
-                    {
-                        if (currentTournament?.Stage != TournamentStage.AddPlayers)
-                        {
-                            // !start only applies once we've started adding players
-                            return;
-                        }
+                return;
+            }
 
-                        await UpdateStage(context.Channel, currentTournament, TournamentStage.BotSetup);
-
-                        // TODO: Add more messaging around the current status
-                        IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
-                            currentTournament.RoundRobinsCount);
-                        currentTournament.Schedule = scheduleFactory.Generate(
-                            new HashSet<Team>(currentTournament.Teams),
-                            new HashSet<Reader>(currentTournament.Readers));
-
-                        await context.Channel.SendMessageAsync("Creating the channels and roles...");
-                        await CreateArtifacts(context, currentTournament);
-
-                        await UpdateStage(context.Channel, currentTournament, TournamentStage.RunningPrelims);
-                        startSucceeded = true;
-                    });
-
-                if (startSucceeded)
+            bool startSucceeded = false;
+            await DoReadWriteActionOnCurrentTournament(
+                context,
+                async currentTournament =>
                 {
-                    await context.Channel.SendMessageAsync($"{context.Channel.Mention}: tournament has started.");
-                }
+                    if (currentTournament?.Stage != TournamentStage.AddPlayers)
+                    {
+                        // !start only applies once we've started adding players
+                        return;
+                    }
+
+                    await UpdateStage(context.Channel, currentTournament, TournamentStage.BotSetup);
+
+                    // TODO: Add more messaging around the current status
+                    IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
+                        currentTournament.RoundRobinsCount);
+                    currentTournament.Schedule = scheduleFactory.Generate(
+                        new HashSet<Team>(currentTournament.Teams),
+                        new HashSet<Reader>(currentTournament.Readers));
+
+                    await context.Channel.SendMessageAsync("Creating the channels and roles...");
+                    await CreateArtifacts(context, currentTournament);
+
+                    await UpdateStage(context.Channel, currentTournament, TournamentStage.RunningPrelims);
+                    startSucceeded = true;
+                });
+
+            if (startSucceeded)
+            {
+                await context.Channel.SendMessageAsync($"{context.Channel.Mention}: tournament has started.");
             }
         }
 
@@ -302,122 +303,127 @@ namespace QBDiscordAssistant.Discord
         [Description("Undoes the current stage and returns to the previous stage.")]
         public Task Back(CommandContext context)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                return DoReadWriteActionOnCurrentTournament(
-                    context,
-                    async currentTournament =>
-                    {
-                        switch (currentTournament.Stage)
-                        {
-                            case TournamentStage.SetRoundRobins:
-                                currentTournament.TryClearReaders();
-                                break;
-                            case TournamentStage.AddTeams:
-                                currentTournament.RoundRobinsCount = 0;
-                                break;
-                            case TournamentStage.AddPlayers:
-                                currentTournament.TryClearTeams();
-                                currentTournament.ClearSymbolsToTeam();
-
-                                List<Task<DiscordMessage>> getJoinTeamMessagesTasks = new List<Task<DiscordMessage>>();
-                                foreach (ulong id in currentTournament.JoinTeamMessageIds)
-                                {
-                                    getJoinTeamMessagesTasks.Add(context.Channel.GetMessageAsync(id));
-                                }
-
-                                DiscordMessage[] joinTeamMessages = await Task.WhenAll(getJoinTeamMessagesTasks);
-                                await context.Channel.DeleteMessagesAsync(
-                                    joinTeamMessages, "Deleting join team messages since we are redoing the add teams stage.");
-
-                                currentTournament.ClearJoinTeamMessageIds();
-                                break;
-                            default:
-                                // Nothing to go back to, so do nothing.
-                                await context.Member.SendMessageAsync(
-                                    $"Cannot go back from the stage {currentTournament.Stage.ToString()}.");
-                                return;
-                        }
-
-                        TournamentStage previousStage = currentTournament.Stage - 1;
-                        await UpdateStage(context.Channel, currentTournament, previousStage);
-                    });
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            return DoReadWriteActionOnCurrentTournament(
+                context,
+                async currentTournament =>
+                {
+                    switch (currentTournament.Stage)
+                    {
+                        case TournamentStage.SetRoundRobins:
+                            currentTournament.TryClearReaders();
+                            break;
+                        case TournamentStage.AddTeams:
+                            currentTournament.RoundRobinsCount = 0;
+                            break;
+                        case TournamentStage.AddPlayers:
+                            currentTournament.TryClearTeams();
+                            currentTournament.ClearSymbolsToTeam();
+
+                            List<Task<DiscordMessage>> getJoinTeamMessagesTasks = new List<Task<DiscordMessage>>();
+                            foreach (ulong id in currentTournament.JoinTeamMessageIds)
+                            {
+                                getJoinTeamMessagesTasks.Add(context.Channel.GetMessageAsync(id));
+                            }
+
+                            DiscordMessage[] joinTeamMessages = await Task.WhenAll(getJoinTeamMessagesTasks);
+                            await context.Channel.DeleteMessagesAsync(
+                                joinTeamMessages, "Deleting join team messages since we are redoing the add teams stage.");
+
+                            currentTournament.ClearJoinTeamMessageIds();
+                            break;
+                        default:
+                            // Nothing to go back to, so do nothing.
+                            await context.Member.SendMessageAsync(
+                                $"Cannot go back from the stage {currentTournament.Stage.ToString()}.");
+                            return;
+                    }
+
+                    TournamentStage previousStage = currentTournament.Stage - 1;
+                    await UpdateStage(context.Channel, currentTournament, previousStage);
+                });
         }
 
         [Command("switchreaders")]
         [Description("Switches the two readers.")]
-        public Task SwitchReader(
+        public async Task SwitchReader(
             CommandContext context,
             [Description("Old reader to replace (as a @mention).")] DiscordMember oldReaderMember,
             [Description("New reader (as a @mention).")] DiscordMember newReaderMember)
         {
-            // TODO: Consider rewriting methods to exit early if we're not in the main channel/have TD privileges.
-            // Alternatively, consider writing an Attribute that does this check for us.
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                return DoReadWriteActionOnCurrentTournament(
-                    context,
-                    async currentTournament =>
-                    {
-                        // Only allow this after the tournament has started running
-                        if (currentTournament.Stage != TournamentStage.RunningPrelims &&
-                            currentTournament.Stage != TournamentStage.Finals)
-                        {
-                            await context.Member.SendMessageAsync("This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.");
-                            return;
-                        }
-
-                        DiscordRole oldReaderRole = oldReaderMember.Roles
-                            .FirstOrDefault(role => role.Name.StartsWith(ReaderRoomRolePrefix));
-                        if (oldReaderRole == null)
-                        {
-                            await context.Member.SendMessageAsync("Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.");
-                            return;
-                        }
-
-                        if (!currentTournament.IsReader(oldReaderMember.Id))
-                        {
-                            await context.Member.SendMessageAsync($"{oldReaderMember.Mention} is not a current reader. You can only replace existing readers.");
-                            return;
-                        }
-                        else if (currentTournament.IsReader(newReaderMember.Id))
-                        {
-                            await context.Member.SendMessageAsync($"{newReaderMember.Mention} is already a reader. The new reader must not be an existing reader.");
-                            return;
-                        }
-
-                        if (!currentTournament.TryRemoveReader(oldReaderMember.Id))
-                        {
-                            await context.Member.SendMessageAsync("Unknown error when trying to remove the old reader.");
-                            return;
-                        }
-
-                        Reader newReader = new Reader()
-                        {
-                            Id = newReaderMember.Id,
-                            Name = newReaderMember.Nickname ?? newReaderMember.DisplayName
-                        };
-                        currentTournament.AddReaders(new Reader[] { newReader });
-
-                        List<Task> roleChangeTasks = new List<Task>();
-                        roleChangeTasks.Add(newReaderMember.GrantRoleAsync(oldReaderRole, "Adding reader role to new reader."));
-                        roleChangeTasks.Add(oldReaderMember.RevokeRoleAsync(oldReaderRole, "Removing reader role from oldreader."));
-                        await Task.WhenAll(roleChangeTasks);
-                        await context.Member.SendMessageAsync("Readers switched successfully.");
-
-                        // Only allow this after the tournament has started running
-                        if (currentTournament.Stage != TournamentStage.RunningPrelims &&
-                            currentTournament.Stage != TournamentStage.Finals)
-                        {
-                            await context.Member.SendMessageAsync("This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.");
-                        }
-                    });
+                return;
             }
 
-            return Task.CompletedTask;
+            bool switchSuccessful = false;
+            DiscordRole oldReaderRole = null;
+            await DoReadWriteActionOnCurrentTournament(
+                context,
+                async currentTournament =>
+                {
+                    // Only allow this after the tournament has started running
+                    if (currentTournament.Stage != TournamentStage.RunningPrelims &&
+                        currentTournament.Stage != TournamentStage.Finals)
+                    {
+                        await context.Member.SendMessageAsync(
+                            "This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.");
+                        return;
+                    }
+
+                    oldReaderRole = oldReaderMember.Roles
+                        .FirstOrDefault(role => role.Name.StartsWith(ReaderRoomRolePrefix));
+                    if (oldReaderRole == null)
+                    {
+                        await context.Member.SendMessageAsync(
+                            "Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.");
+                        return;
+                    }
+
+                    if (!currentTournament.IsReader(oldReaderMember.Id))
+                    {
+                        await context.Member.SendMessageAsync(
+                            $"{oldReaderMember.Mention} is not a current reader. You can only replace existing readers.");
+                        return;
+                    }
+                    else if (currentTournament.IsReader(newReaderMember.Id))
+                    {
+                        await context.Member.SendMessageAsync(
+                            $"{newReaderMember.Mention} is already a reader. The new reader must not be an existing reader.");
+                        return;
+                    }
+
+                    if (!currentTournament.TryRemoveReader(oldReaderMember.Id))
+                    {
+                        await context.Member.SendMessageAsync(
+                            "Unknown error when trying to remove the old reader.");
+                        return;
+                    }
+
+                    Reader newReader = new Reader()
+                    {
+                        Id = newReaderMember.Id,
+                        Name = newReaderMember.Nickname ?? newReaderMember.DisplayName
+                    };
+                    currentTournament.AddReaders(new Reader[] { newReader });
+
+                    switchSuccessful = true;
+                });
+
+            if (!switchSuccessful)
+            {
+                return;
+            }
+
+            List<Task> roleChangeTasks = new List<Task>();
+            roleChangeTasks.Add(newReaderMember.GrantRoleAsync(oldReaderRole, "Adding reader role to new reader."));
+            roleChangeTasks.Add(oldReaderMember.RevokeRoleAsync(oldReaderRole, "Removing reader role from oldreader."));
+            await Task.WhenAll(roleChangeTasks);
+            await context.Member.SendMessageAsync("Readers switched successfully.");
         }
 
         [Command("finals")]
@@ -427,124 +433,126 @@ namespace QBDiscordAssistant.Discord
             [Description("Reader for the finals (as a @mention).")] DiscordMember readerMember,
             [Description("Name of the two teams in the finals, separated by a comma.")] params string[] rawTeamNameParts)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                DiscordChannel channel = null;
-                await DoReadWriteActionOnCurrentTournament(
-                    context,
-                    async currentTournament =>
-                    {
-                        if (currentTournament?.Stage != TournamentStage.RunningPrelims)
-                        {
-                            await context.Member.SendMessageAsync(
-                                "Error: finals can only be set during the prelims.");
-                            return;
-                        }
+                return;
+            }
 
-                        if (!currentTournament.TryGetReader(readerMember.Id, out Reader reader))
-                        {
-                            await context.Member.SendMessageAsync(
-                                "Error: given user isn't a reader.");
-                            return;
-                        }
-
-                        if (rawTeamNameParts == null)
-                        {
-                            await context.Member.SendMessageAsync(
-                                "Error: No teams specified.");
-                            return;
-                        }
-
-                        string combinedTeamNames = string.Join(" ", rawTeamNameParts).Trim();
-                        if (!TeamNameParser.TryGetTeamNamesFromParts(
-                            combinedTeamNames, out HashSet<string> teamNames, out string errorMessage))
-                        {
-                            await context.Member.SendMessageAsync($"Error: {errorMessage}");
-                            return;
-                        }
-
-                        if (teamNames.Count != 2)
-                        {
-                            await context.Member.SendMessageAsync(
-                                $"Error: two teams must be specified in the finals. You have specified {teamNames.Count}.");
-                            return;
-                        }
-
-                        Team[] teams = teamNames.Select(name => new Team()
-                        {
-                            Name = name
-                        })
-                            .ToArray();
-                        if (currentTournament.Teams.Intersect(teams).Count() != teams.Length)
-                        {
-                            // TODO: Improve error message by explicitly searching for the missing team.
-                            await context.Member.SendMessageAsync(
-                                $"Error: At least one team specified is not in the tournament. Teams specified: {string.Join(",", teamNames)}");
-                            return;
-                        }
-
-                        // Create a finals channel and give access to the teams and readers
-                        Game finalsGame = new Game()
-                        {
-                            Reader = reader,
-                            Teams = teams
-                        };
-
-                        int finalsRoundNumber = currentTournament.Schedule.Rounds.Count + 1;
-                        IList<Game> finalGames =
-                            currentTournament.Schedule.Rounds[currentTournament.Schedule.Rounds.Count - 1].Games;
-                        int roomIndex = 0;
-                        foreach (Game game in finalGames)
-                        {
-                            if (game.Reader.Equals(reader))
-                            {
-                                break;
-                            }
-
-                            roomIndex++;
-                        }
-
-                        if (roomIndex >= finalGames.Count)
-                        {
-                            // Need to have a fall-back somehow. For now default to the first room.
-                            roomIndex = 0;
-                        }
-
-                        // TODO: We should split up this method.
-                        DiscordRole directorRole = context.Guild.GetRole(currentTournament.TournamentRoles.DirectorRoleId);
-                        DiscordRole[] roomReaderRoles = currentTournament.TournamentRoles.ReaderRoomRoleIds
-                            .Select(roleId => context.Guild.GetRole(roleId)).ToArray();
-                        Dictionary<Team, DiscordRole> teamRoles = currentTournament.TournamentRoles.TeamRoleIds
-                            .ToDictionary(kvp => kvp.Key, kvp => context.Guild.GetRole(kvp.Value));
-
-                        TournamentRoles tournamentRoles = new TournamentRoles()
-                        {
-                            DirectorRole = directorRole,
-                            RoomReaderRoles = roomReaderRoles,
-                            TeamRoles = teamRoles
-                        };
-
-                        // TODO: Look into creating the channels after the update stage so we can release the lock
-                        // sooner. However, this does mean that a failure to create channels will leave us in a bad 
-                        // stage.
-                        DiscordChannel finalsCategoryChannel = await context.Guild.CreateChannelAsync(
-                            $"Finals", ChannelType.Category);
-                        channel = await CreateTextChannel(
-                            context,
-                            finalsCategoryChannel,
-                            finalsGame,
-                            tournamentRoles,
-                            finalsRoundNumber,
-                            roomIndex);
-                        currentTournament.UpdateStage(
-                            TournamentStage.Finals, out string nextStageTitle, out string nextStageInstructions);
-                    });
-
-                if (channel != null)
+            DiscordChannel channel = null;
+            await DoReadWriteActionOnCurrentTournament(
+                context,
+                async currentTournament =>
                 {
-                    await context.Channel.SendMessageAsync(
-                        $"Finals participants: please join the room {channel.Name} and join the voice channel for that room number.");
-                }
+                    if (currentTournament?.Stage != TournamentStage.RunningPrelims)
+                    {
+                        await context.Member.SendMessageAsync(
+                            "Error: finals can only be set during the prelims.");
+                        return;
+                    }
+
+                    if (!currentTournament.TryGetReader(readerMember.Id, out Reader reader))
+                    {
+                        await context.Member.SendMessageAsync(
+                            "Error: given user isn't a reader.");
+                        return;
+                    }
+
+                    if (rawTeamNameParts == null)
+                    {
+                        await context.Member.SendMessageAsync(
+                            "Error: No teams specified.");
+                        return;
+                    }
+
+                    string combinedTeamNames = string.Join(" ", rawTeamNameParts).Trim();
+                    if (!TeamNameParser.TryGetTeamNamesFromParts(
+                        combinedTeamNames, out HashSet<string> teamNames, out string errorMessage))
+                    {
+                        await context.Member.SendMessageAsync($"Error: {errorMessage}");
+                        return;
+                    }
+
+                    if (teamNames.Count != 2)
+                    {
+                        await context.Member.SendMessageAsync(
+                            $"Error: two teams must be specified in the finals. You have specified {teamNames.Count}.");
+                        return;
+                    }
+
+                    Team[] teams = teamNames.Select(name => new Team()
+                    {
+                        Name = name
+                    })
+                        .ToArray();
+                    if (currentTournament.Teams.Intersect(teams).Count() != teams.Length)
+                    {
+                        // TODO: Improve error message by explicitly searching for the missing team.
+                        await context.Member.SendMessageAsync(
+                            $"Error: At least one team specified is not in the tournament. Teams specified: {string.Join(",", teamNames)}");
+                        return;
+                    }
+
+                    // Create a finals channel and give access to the teams and readers
+                    Game finalsGame = new Game()
+                    {
+                        Reader = reader,
+                        Teams = teams
+                    };
+
+                    int finalsRoundNumber = currentTournament.Schedule.Rounds.Count + 1;
+                    IList<Game> finalGames =
+                        currentTournament.Schedule.Rounds[currentTournament.Schedule.Rounds.Count - 1].Games;
+                    int roomIndex = 0;
+                    foreach (Game game in finalGames)
+                    {
+                        if (game.Reader.Equals(reader))
+                        {
+                            break;
+                        }
+
+                        roomIndex++;
+                    }
+
+                    if (roomIndex >= finalGames.Count)
+                    {
+                        // Need to have a fall-back somehow. For now default to the first room.
+                        roomIndex = 0;
+                    }
+
+                    // TODO: We should split up this method.
+                    DiscordRole directorRole = context.Guild.GetRole(currentTournament.TournamentRoles.DirectorRoleId);
+                    DiscordRole[] roomReaderRoles = currentTournament.TournamentRoles.ReaderRoomRoleIds
+                        .Select(roleId => context.Guild.GetRole(roleId)).ToArray();
+                    Dictionary<Team, DiscordRole> teamRoles = currentTournament.TournamentRoles.TeamRoleIds
+                        .ToDictionary(kvp => kvp.Key, kvp => context.Guild.GetRole(kvp.Value));
+
+                    TournamentRoles tournamentRoles = new TournamentRoles()
+                    {
+                        DirectorRole = directorRole,
+                        RoomReaderRoles = roomReaderRoles,
+                        TeamRoles = teamRoles
+                    };
+
+                    // TODO: Look into creating the channels after the update stage so we can release the lock
+                    // sooner. However, this does mean that a failure to create channels will leave us in a bad 
+                    // stage.
+                    DiscordChannel finalsCategoryChannel = await context.Guild.CreateChannelAsync(
+                        $"Finals", ChannelType.Category);
+                    channel = await CreateTextChannel(
+                        context,
+                        finalsCategoryChannel,
+                        finalsGame,
+                        tournamentRoles,
+                        finalsRoundNumber,
+                        roomIndex);
+                    currentTournament.UpdateStage(
+                        TournamentStage.Finals, out string nextStageTitle, out string nextStageInstructions);
+                });
+
+            if (channel != null)
+            {
+                await context.Channel.SendMessageAsync(
+                    $"Finals participants: please join the room {channel.Name} and join the voice channel for that room number.");
             }
         }
 
@@ -552,22 +560,23 @@ namespace QBDiscordAssistant.Discord
         [Description("Ends the current tournament.")]
         public async Task End(CommandContext context)
         {
-            if (IsMainChannel(context) && HasTournamentDirectorPrivileges(context))
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
             {
-                await DoReadWriteActionOnCurrentTournament(
+                return;
+            }
+
+            await DoReadWriteActionOnCurrentTournament(
                     context,
                     currentTournament => CleanupTournamentArtifacts(context, currentTournament));
 
-                TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
-                if (manager.TryClearCurrentTournament())
-                {
-                    await context.Member.SendMessageAsync("Tournament cleanup finished.");
-                }
-                else
-                {
-                    await context.Member.SendMessageAsync("Tournament was not removed from the list of pending tournaments. Try the command again.");
-                }
+            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            if (!manager.TryClearCurrentTournament())
+            {
+                await context.Member.SendMessageAsync("Tournament was not removed from the list of pending tournaments. Try the command again.");
+                return;
             }
+
+            await context.Member.SendMessageAsync("Tournament cleanup finished.");
         }
 
         // TODO: Implement !back, which will go back a stage.
@@ -888,8 +897,14 @@ namespace QBDiscordAssistant.Discord
                 (context.Channel.PermissionsFor(member) & Permissions.Administrator) == Permissions.Administrator;
         }
 
-        private static bool HasTournamentDirectorPrivileges(CommandContext context)
+        private static bool InMainChannelWithTournamentDirectorPrivileges(CommandContext context)
         {
+            // Commands only apply to the main channel (though we may want to move this to DMs)
+            if (!IsMainChannel(context))
+            {
+                return false;
+            }
+
             // TD is only allowed to run commands when they are a director of the current tournament.
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             Result<bool> result = manager.TryReadActionOnCurrentTournament(currentTournament =>
