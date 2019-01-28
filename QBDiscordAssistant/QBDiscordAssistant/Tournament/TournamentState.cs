@@ -33,6 +33,9 @@ namespace QBDiscordAssistant.Tournament
 
         public TournamentRoleIds TournamentRoles { get; set; }
 
+        // TODO: Investigate if DirectorIds should have a setter too, now that this is protected by read/write locks.
+        public IEnumerable<ulong> ChannelIds { get; set; }
+
         public IEnumerable<ulong> DirectorIds => this.directorIds;
 
         public TournamentStage Stage { get; private set; }

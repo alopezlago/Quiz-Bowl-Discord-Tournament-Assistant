@@ -6,6 +6,7 @@ namespace QBDiscordAssistant.Tournament
     {
         IEnumerable<ulong> DirectorIds { get; }
         ulong GuildId { get; }
+        IEnumerable<ulong> ChannelIds { get; }
         IEnumerable<ulong> JoinTeamMessageIds { get; }
         string Name { get; }
         IEnumerable<Player> Players { get; }

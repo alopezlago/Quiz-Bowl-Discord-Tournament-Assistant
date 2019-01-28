@@ -4,6 +4,7 @@ namespace QBDiscordAssistant.Tournament
 {
     public interface ITournamentState : IReadOnlyTournamentState
     {
+        new IEnumerable<ulong> ChannelIds { get; set; }
         new int RoundRobinsCount { get; set; }
         new Schedule Schedule { get; set; }
         new TournamentRoleIds TournamentRoles { get; set; }

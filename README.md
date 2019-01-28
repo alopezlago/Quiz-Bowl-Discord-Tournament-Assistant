@@ -35,13 +35,11 @@ Starting a tournament:
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
 
 
-TODO: Track member name changes so we can update reader/player names.
-TODO: Be smarter about which channels we delete
-TODO: Add voice channels to a category
-TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier.
-TODO: Add multi-guild support
 TODO: Write guide for how to start a tournament as a TD
-TODO: Add persistence of tournaments
+TODO: Add multi-guild support
+TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs.
+TODO: Track member name changes so we can update reader/player names.
+TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier.
 TODO: Have an option to allow for more automation, that would enable:
   - !win <team> in the channel would track who won that game, and would grant them permissions for the next room.
   - Tracking player buzzes. Either use a queue and clear on a score (0/10/15, etc.), or store a timestamp of the last buzz in the channel and mention the user if it's been long enough.

@@ -566,8 +566,8 @@ namespace QBDiscordAssistant.Discord
             }
 
             await DoReadWriteActionOnCurrentTournament(
-                    context,
-                    currentTournament => CleanupTournamentArtifacts(context, currentTournament));
+                context,
+                currentTournament => CleanupTournamentArtifacts(context, currentTournament));
 
             TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             if (!manager.TryClearCurrentTournament())
@@ -577,6 +577,21 @@ namespace QBDiscordAssistant.Discord
             }
 
             await context.Member.SendMessageAsync("Tournament cleanup finished.");
+        }
+
+        [Command("clearAll")]
+        [Description("Clears all leftover channels and roles from a tournament that didn't end cleanly.")]
+        public async Task ClearAll(CommandContext context)
+        {
+            if (!InMainChannelWithTournamentDirectorPrivileges(context))
+            {
+                return;
+            }
+
+            await DoReadActionOnCurrentTournament(
+                context,
+                currentTournament => CleanupAllPossibleTournamentArtifacts(context, currentTournament));
+            await context.Member.SendMessageAsync("All possible tournament artifacts cleaned up.");
         }
 
         // TODO: Implement !back, which will go back a stage.
@@ -636,16 +651,18 @@ namespace QBDiscordAssistant.Discord
                 createVoiceChannelsTasks.Add(CreateVoiceChannel(context, voiceCategoryChannel, roles, game.Reader));
             }
 
-            await Task.WhenAll(createVoiceChannelsTasks);
+            DiscordChannel[] voiceChannels = await Task.WhenAll(createVoiceChannelsTasks);
 
             // Create the text channels
-            List<Task> createTextChannelsTasks = new List<Task>();
+            List<Task<DiscordChannel>> createTextChannelsTasks = new List<Task<DiscordChannel>>();
+            List<ulong> textCategoryChannelIds = new List<ulong>();
             int roundNumber = 1;
             foreach (Round round in state.Schedule.Rounds)
             {
                 int roomNumber = 0;
                 DiscordChannel roundCategoryChannel = await context.Guild.CreateChannelAsync(
                     $"Round {roundNumber}", ChannelType.Category);
+                textCategoryChannelIds.Add(roundCategoryChannel.Id);
 
                 foreach (Game game in round.Games)
                 {
@@ -657,7 +674,12 @@ namespace QBDiscordAssistant.Discord
                 roundNumber++;
             }
 
-            await Task.WhenAll(createTextChannelsTasks);
+            DiscordChannel[] textChannels = await Task.WhenAll(createTextChannelsTasks);
+            state.ChannelIds = voiceChannels.Select(channel => channel.Id)
+                .Concat(textChannels.Select(channel => channel.Id))
+                .Concat(new ulong[] { voiceCategoryChannel.Id })
+                .Concat(textCategoryChannelIds)
+                .ToArray();
         }
 
         private static async Task<KeyValuePair<Team, DiscordRole>> CreateTeamRole(CommandContext context, Team team)
@@ -807,26 +829,41 @@ namespace QBDiscordAssistant.Discord
         // Removes channels and roles.
         private static async Task CleanupTournamentArtifacts(CommandContext context, ITournamentState state)
         {
-            // Simplest way is to delete all channels that are not a main channel
-            // TODO: Store channel IDs in the state and delete those
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
-            List<Task> deleteChannelsTask = new List<Task>();
+            IEnumerable<Task> deleteChannelTasks = state.ChannelIds
+                .Select(id => context.Guild.GetChannel(id))
+                .Where(channel => channel != null)
+                .Select(channel => channel.DeleteAsync("Tournament is over."));
+
+            IEnumerable<ulong> roleIds = state.TournamentRoles.ReaderRoomRoleIds
+                .Concat(state.TournamentRoles.TeamRoleIds.Select(kvp => kvp.Value))
+                .Concat(new ulong[] { state.TournamentRoles.DirectorRoleId });
+            IEnumerable<Task> deleteRoleTasks = roleIds
+                .Select(id => context.Guild.GetRole(id))
+                .Where(role => role != null)
+                .Select(role => context.Guild.DeleteRoleAsync(role, "Tournament is over."));
+
+            await Task.WhenAll(deleteChannelTasks.Concat(deleteRoleTasks));
+            await UpdateStage(context.Channel, state, TournamentStage.Complete);
+        }
+
+        // Removes all possible channels and roles created by the bot.
+        private static async Task CleanupAllPossibleTournamentArtifacts(
+            CommandContext context, IReadOnlyTournamentState state)
+        {
+            // Simplest way is to delete all channels that are not a main channel
+            BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
+            List<Task> deleteChannelTasks = new List<Task>();
             foreach (DiscordChannel channel in context.Guild.Channels)
             {
                 // This should only be accepted on the main channel.
                 if (channel != context.Channel)
                 {
-                    deleteChannelsTask.Add(channel.DeleteAsync("Tournament is over."));
+                    deleteChannelTasks.Add(channel.DeleteAsync("Tournament is over."));
                 }
             }
 
-            // TODO: Remove the channel roles
-            // They all start with Role_. This will make sure that, even if a reader is removed from the list somehow,
-            // we get all of the roles
-            List<Task> deleteRolesTask = new List<Task>();
-
-            // TODO: move to using the ids in the tournament state. This is useful until we have a way to clean up
-            // artifacts from tournaments where the bot crashed.
+            List<Task> deleteRoleTasks = new List<Task>();
             IReadOnlyList<DiscordRole> roles = context.Guild.Roles;
             foreach (DiscordRole role in roles)
             {
@@ -835,13 +872,14 @@ namespace QBDiscordAssistant.Discord
                     roleName.StartsWith(ReaderRoomRolePrefix) ||
                     roleName.StartsWith(TeamRolePrefix))
                 {
-                    deleteRolesTask.Add(context.Guild.DeleteRoleAsync(role));
+                    deleteRoleTasks.Add(context.Guild.DeleteRoleAsync(role));
                 }
             }
 
-            await Task.WhenAll(deleteChannelsTask);
-            await Task.WhenAll(deleteRolesTask);
-            await UpdateStage(context.Channel, state, TournamentStage.Complete);
+            await Task.WhenAll(deleteChannelTasks);
+            await Task.WhenAll(deleteRoleTasks);
+            // We don't need to update the tournament stage because this should be used when the tournament is
+            // completed or no longer exists 
         }
 
         private static Task DoReadActionOnCurrentTournament(
