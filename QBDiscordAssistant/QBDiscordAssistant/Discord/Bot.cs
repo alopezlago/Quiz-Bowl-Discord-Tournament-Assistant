@@ -36,8 +36,8 @@ namespace QBDiscordAssistant.Discord
             DependencyCollectionBuilder dependencyCollectionBuilder = new DependencyCollectionBuilder();
             dependencyCollectionBuilder.AddInstance(configuration);
 
-            TournamentsManager manager = new TournamentsManager();
-            dependencyCollectionBuilder.AddInstance(manager);
+            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
+            dependencyCollectionBuilder.AddInstance(globalManager);
 
             this.commandsModule = this.discordClient.UseCommandsNext(new CommandsNextConfiguration()
             {
@@ -49,7 +49,7 @@ namespace QBDiscordAssistant.Discord
 
             this.commandsModule.RegisterCommands<BotCommands>();
 
-            this.eventHandler = new BotEventHandler(this.discordClient, manager);
+            this.eventHandler = new BotEventHandler(this.discordClient, globalManager);
         }
 
         public Task ConnectAsync()

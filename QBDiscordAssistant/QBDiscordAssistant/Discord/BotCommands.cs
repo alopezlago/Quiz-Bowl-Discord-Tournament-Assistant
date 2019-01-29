@@ -29,12 +29,7 @@ namespace QBDiscordAssistant.Discord
             PrioritySpeaker;
 
         // TODO: Move all of the implementation to the BotCommandHandler methods so that they can be unit tested.
-        // TODO: Instead of sending confirmations to the channel, maybe send then to the user who did them? One issue is
-        // that they're not going to be looking at their DMs.
-        // TODO: Look into abstracting away some of the "get members of X". Should simplify the permissions setting.
-        // TODO: Set permissions per team and per reader. Should reduce the number of roles we need to create.
 
-        // TODO: strings are split by spaces, so we need to get the parameter from the raw string.
         [Command("addTD")]
         [Description("Adds a tournament director to a tournament, and creates that tournament if it doesn't exist yet.")]
         [RequireOwner]
@@ -44,13 +39,16 @@ namespace QBDiscordAssistant.Discord
             [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
             [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
-            if (!IsMainChannel(context) || tournamentNameParts.Length == 0)
+            if (!IsPublicChannel(context) || tournamentNameParts.Length == 0)
             {
                 return Task.CompletedTask;
             }
-
+            
             string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
+
             ITournamentState state = new TournamentState(context.Guild.Id, tournamentName);
             bool updateSuccessful = state.TryAddDirector(newDirector.Id);
 
@@ -66,10 +64,10 @@ namespace QBDiscordAssistant.Discord
             // after RoleSetup we should give them the TD role.
             if (updateSuccessful)
             {
-                return context.Member.SendMessageAsync($"Added tournament director to tournament '{tournamentName}'.");
+                return context.Member.SendMessageAsync($"Added tournament director to tournament '{tournamentName}' in guild '{context.Guild.Name}'.");
             }
 
-            return context.Member.SendMessageAsync($"User is already a director of '{tournamentName}'.");
+            return context.Member.SendMessageAsync($"User is already a director of '{tournamentName}' in guild '{context.Guild.Name}'.");
         }
 
         [Command("removeTD")]
@@ -81,13 +79,14 @@ namespace QBDiscordAssistant.Discord
             [Description("Member to add as the tournament director (as a @mention).")] DiscordMember newDirector,
             [Description("Name of the tournament.")] params string[] tournamentNameParts)
         {
-            if (!IsMainChannel(context))
+            if (!IsPublicChannel(context))
             {
                 return Task.CompletedTask;
             }
 
             string tournamentName = string.Join(" ", tournamentNameParts).Trim();
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
 
             // TODO: Harden this. Since it's not guaranteed to be the current tournament, we can't use the helper
             // methods
@@ -99,18 +98,18 @@ namespace QBDiscordAssistant.Discord
             if (state.TryRemoveDirector(newDirector.Id))
             {
                 return context.Channel.SendMessageAsync(
-                    $"Removed tournament director from tournament '{tournamentName}'.");
+                    $"Removed tournament director from tournament '{tournamentName}' in guild '{context.Guild.Name}'.");
             }
 
             return context.Channel.SendMessageAsync(
-                $"User is not a director for tournament '{tournamentName}', or user was just removed.");
+                $"User is not a director for tournament '{tournamentName}' in guild '{context.Guild.Name}', or user was just removed.");
         }
 
         [Command("getCurrentTournament")]
         [Description("Gets the name of the current tournament, if it exists.")]
         public Task GetCurrentTournament(CommandContext context)
         {
-            if (!IsMainChannel(context))
+            if (!IsPublicChannel(context))
             {
                 return Task.CompletedTask;
             }
@@ -119,7 +118,7 @@ namespace QBDiscordAssistant.Discord
             // error message to the user instead.
             return DoReadActionOnCurrentTournament(
                 context,
-                currentTournament => context.Channel.SendMessageAsync($"Current tournament: {currentTournament.Name}"));
+                currentTournament => context.Channel.SendMessageAsync($"Current tournament in guild '{context.Guild.Name}': {currentTournament.Name}"));
         }
 
         [Command("setup")]
@@ -128,7 +127,7 @@ namespace QBDiscordAssistant.Discord
             CommandContext context,
             [Description("Name of the tournament.")] params string[] rawTournamentNameParts)
         {
-            if (!IsMainChannel(context))
+            if (!IsPublicChannel(context))
             {
                 return Task.CompletedTask;
             }
@@ -136,18 +135,21 @@ namespace QBDiscordAssistant.Discord
             // It's okay not to harden this too much, because they can retry the action, and their failure doesn't 
             // make anything inconsistent.
             string tournamentName = string.Join(" ", rawTournamentNameParts).Trim();
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
+
             bool hasSetupPermissions = IsAdminUser(context, context.Member) ||
                 (manager.TryGetTournament(tournamentName, out ITournamentState state) && state.IsDirector(context.User.Id));
             if (!hasSetupPermissions)
             {
-                return context.Member.SendMessageAsync("You do not have permissions to setup that tournament.");
+                return context.Member.SendMessageAsync(
+                    $"You do not have permissions to set up that tournament in guild '{context.Guild.Name}'.");
             }
 
             if (!manager.TrySetCurrentTournament(tournamentName))
             {
                 return context.Member.SendMessageAsync(
-                    "That tournament can't be set up right now. Another tournament may be currently running. If one isn't being run, try the command again.");
+                    $"That tournament can't be set up right now. Another tournament may be currently running in guild '{context.Guild.Name}'. If one isn't being run, try the command again.");
             }
 
             return DoReadWriteActionOnCurrentTournament(context,
@@ -155,8 +157,6 @@ namespace QBDiscordAssistant.Discord
         }
 
         // TODO: Add removeTeams
-
-        // TODO: Add clear (reset players, teams, readers, round robins)
 
         [Command("addPlayer")]
         [Description("Adds a player to a team.")]
@@ -279,18 +279,29 @@ namespace QBDiscordAssistant.Discord
 
                     await UpdateStage(context.Channel, currentTournament, TournamentStage.BotSetup);
 
-                    // TODO: Add more messaging around the current status
-                    IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
-                        currentTournament.RoundRobinsCount);
-                    currentTournament.Schedule = scheduleFactory.Generate(
-                        new HashSet<Team>(currentTournament.Teams),
-                        new HashSet<Reader>(currentTournament.Readers));
+                    try
+                    {
+                        // TODO: Add more messaging around the current status
+                        IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
+                            currentTournament.RoundRobinsCount);
+                        currentTournament.Schedule = scheduleFactory.Generate(
+                            new HashSet<Team>(currentTournament.Teams),
+                            new HashSet<Reader>(currentTournament.Readers));
 
-                    await context.Channel.SendMessageAsync("Creating the channels and roles...");
-                    await CreateArtifacts(context, currentTournament);
+                        await context.Channel.SendMessageAsync("Creating the channels and roles...");
+                        await CreateArtifacts(context, currentTournament);
 
-                    await UpdateStage(context.Channel, currentTournament, TournamentStage.RunningPrelims);
-                    startSucceeded = true;
+                        await UpdateStage(context.Channel, currentTournament, TournamentStage.RunningPrelims);
+                        startSucceeded = true;
+                    }
+                    catch (Exception)
+                    {
+                        // TODO: Make the exceptions we catch more-defined.
+                        // Go back to the previous stage and undo any artifacts added.
+                        await CleanupTournamentArtifacts(context, currentTournament);
+                        await UpdateStage(context.Channel, currentTournament, TournamentStage.AddPlayers);
+                        throw;
+                    }
                 });
 
             if (startSucceeded)
@@ -569,14 +580,15 @@ namespace QBDiscordAssistant.Discord
                 context,
                 currentTournament => CleanupTournamentArtifacts(context, currentTournament));
 
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
             if (!manager.TryClearCurrentTournament())
             {
                 await context.Member.SendMessageAsync("Tournament was not removed from the list of pending tournaments. Try the command again.");
                 return;
             }
 
-            await context.Member.SendMessageAsync("Tournament cleanup finished.");
+            await context.Member.SendMessageAsync($"Tournament cleanup finished in guild '{context.Guild.Name}'.");
         }
 
         [Command("clearAll")]
@@ -591,12 +603,8 @@ namespace QBDiscordAssistant.Discord
             await DoReadActionOnCurrentTournament(
                 context,
                 currentTournament => CleanupAllPossibleTournamentArtifacts(context, currentTournament));
-            await context.Member.SendMessageAsync("All possible tournament artifacts cleaned up.");
+            await context.Member.SendMessageAsync($"All possible tournament artifacts cleaned up in guild '{context.Guild.Name}'.");
         }
-
-        // TODO: Implement !back, which will go back a stage.
-        // This does mean that, if we go back to add players, we'll need to re-send the messages, and possibly clear
-        // all the players so that the reactions are consistent.
 
         // Commands:
         // Note that Admins can perform all TD actions.
@@ -830,18 +838,26 @@ namespace QBDiscordAssistant.Discord
         private static async Task CleanupTournamentArtifacts(CommandContext context, ITournamentState state)
         {
             BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
-            IEnumerable<Task> deleteChannelTasks = state.ChannelIds
+            IEnumerable<Task> deleteChannelTasks = state.ChannelIds?
                 .Select(id => context.Guild.GetChannel(id))
                 .Where(channel => channel != null)
                 .Select(channel => channel.DeleteAsync("Tournament is over."));
+            if (deleteChannelTasks == null)
+            {
+                deleteChannelTasks = new Task[0];
+            }
 
-            IEnumerable<ulong> roleIds = state.TournamentRoles.ReaderRoomRoleIds
+            IEnumerable<ulong> roleIds = state.TournamentRoles?.ReaderRoomRoleIds
                 .Concat(state.TournamentRoles.TeamRoleIds.Select(kvp => kvp.Value))
                 .Concat(new ulong[] { state.TournamentRoles.DirectorRoleId });
-            IEnumerable<Task> deleteRoleTasks = roleIds
+            IEnumerable<Task> deleteRoleTasks = roleIds?
                 .Select(id => context.Guild.GetRole(id))
                 .Where(role => role != null)
                 .Select(role => context.Guild.DeleteRoleAsync(role, "Tournament is over."));
+            if (deleteRoleTasks == null)
+            {
+                deleteRoleTasks = new Task[0];
+            }
 
             await Task.WhenAll(deleteChannelTasks.Concat(deleteRoleTasks));
             await UpdateStage(context.Channel, state, TournamentStage.Complete);
@@ -882,17 +898,26 @@ namespace QBDiscordAssistant.Discord
             // completed or no longer exists 
         }
 
+        private static TournamentsManager CreateTournamentsManager(ulong id)
+        {
+            TournamentsManager manager = new TournamentsManager();
+            manager.GuildId = id;
+            return manager;
+        }
+
         private static Task DoReadActionOnCurrentTournament(
             CommandContext context, Func<IReadOnlyTournamentState, Task> action)
         {
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
             return manager.DoReadActionOnCurrentTournamentForMember(context.Member, action);
         }
 
         private static Task DoReadWriteActionOnCurrentTournament(
             CommandContext context, Func<ITournamentState, Task> action)
         {
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
             return manager.DoReadWriteActionOnCurrentTournamentForMember(context.Member, action);
         }
 
@@ -925,10 +950,9 @@ namespace QBDiscordAssistant.Discord
             return $"{reader.Name}'s_Voice_Channel";
         }
 
-        private static bool IsMainChannel(CommandContext context)
+        private static bool IsPublicChannel(CommandContext context)
         {
-            BotConfiguration configuration = context.Dependencies.GetDependency<BotConfiguration>();
-            return context.Channel.Name == configuration.MainChannelName;
+            return !context.Channel.IsPrivate;
         }
 
         private static bool IsAdminUser(CommandContext context, DiscordMember member)
@@ -940,13 +964,15 @@ namespace QBDiscordAssistant.Discord
         private static bool InMainChannelWithTournamentDirectorPrivileges(CommandContext context)
         {
             // Commands only apply to the main channel (though we may want to move this to DMs)
-            if (!IsMainChannel(context))
+            if (!IsPublicChannel(context))
             {
                 return false;
             }
 
+            GlobalTournamentsManager globalManager = context.Dependencies.GetDependency<GlobalTournamentsManager>();
+            TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
+
             // TD is only allowed to run commands when they are a director of the current tournament.
-            TournamentsManager manager = context.Dependencies.GetDependency<TournamentsManager>();
             Result<bool> result = manager.TryReadActionOnCurrentTournament(currentTournament =>
                 currentTournament.GuildId == context.Guild.Id &&
                 (IsAdminUser(context, context.Member) || currentTournament.IsDirector(context.User.Id))

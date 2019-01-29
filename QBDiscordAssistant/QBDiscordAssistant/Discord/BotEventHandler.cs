@@ -18,18 +18,19 @@ namespace QBDiscordAssistant.Discord
         private const int MaxTeamsInMessage = 20;
 
         private readonly DiscordClient client;
-        private readonly TournamentsManager manager;
 
-        public BotEventHandler(DiscordClient client, TournamentsManager manager)
+        public BotEventHandler(DiscordClient client, GlobalTournamentsManager globalManager)
         {
             this.IsDisposed = false;
             this.client = client;
-            this.manager = manager;
+            this.GlobalManager = globalManager;
 
             this.client.MessageCreated += this.OnMessageCreated;
             this.client.MessageReactionAdded += this.OnReactionAdded;
             this.client.MessageReactionRemoved += this.OnReactionRemoved;
         }
+
+        private GlobalTournamentsManager GlobalManager { get; }
 
         private bool IsDisposed { get; set; }
 
@@ -56,7 +57,7 @@ namespace QBDiscordAssistant.Discord
 
             Player player = null;
             bool playerAdded = false;
-            bool attempt = this.manager.TryReadWriteActionOnCurrentTournament(currentTournament =>
+            bool attempt = this.GetTournamentsManager(args.Channel.Guild).TryReadWriteActionOnCurrentTournament(currentTournament =>
             {
                 player = GetPlayerFromReactionEventOrNull(
                     currentTournament, args.User, args.Message.Id, args.Emoji.Name);
@@ -107,7 +108,7 @@ namespace QBDiscordAssistant.Discord
             // TODO: We may want to make this a dictionary of IDs to Players to make this operation efficient. We could
             // use ContainsKey to do the contains checks efficiently.
             DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.User.Id);
-            await this.manager.DoReadWriteActionOnCurrentTournamentForMember(
+            await this.GetTournamentsManager(args.Channel.Guild).DoReadWriteActionOnCurrentTournamentForMember(
                 member,
                 async currentTournament =>
                 {
@@ -145,7 +146,8 @@ namespace QBDiscordAssistant.Discord
             // Don't use the helper method because we don't want to message the user each time if there's no tournament.
             // We also want to split this check and the TD check because we don't need to get the Discord member for
             // this check.
-            Result<bool> currentTournamentExists = this.manager.TryReadActionOnCurrentTournament(currentTournament => true);
+            TournamentsManager manager = this.GetTournamentsManager(args.Channel.Guild);
+            Result<bool> currentTournamentExists = manager.TryReadActionOnCurrentTournament(currentTournament => true);
             if (!currentTournamentExists.Success)
             {
                 return;
@@ -153,14 +155,14 @@ namespace QBDiscordAssistant.Discord
 
             // We want to do the basic access checks before using the more expensive write lock.
             DiscordMember member = await args.Channel.Guild.GetMemberAsync(args.Author.Id);
-            Result<bool> hasDirectorPrivileges = this.manager.TryReadActionOnCurrentTournament(
+            Result<bool> hasDirectorPrivileges = manager.TryReadActionOnCurrentTournament(
                 currentTournament => HasTournamentDirectorPrivileges(currentTournament, args.Channel, member));
             if (!(hasDirectorPrivileges.Success && hasDirectorPrivileges.Value))
             {
                 return;
             }
 
-            await this.manager.DoReadWriteActionOnCurrentTournamentForMember(
+            await manager.DoReadWriteActionOnCurrentTournamentForMember(
                 member,
                 async currentTournament =>
                 {
@@ -423,6 +425,18 @@ namespace QBDiscordAssistant.Discord
             addTeamsEmbedBuilder.Title = title;
             addTeamsEmbedBuilder.Description = instructions;
             await channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
+        }
+
+        private static TournamentsManager CreateTournamentsManager(ulong id)
+        {
+            TournamentsManager manager = new TournamentsManager();
+            manager.GuildId = id;
+            return manager;
+        }
+
+        private TournamentsManager GetTournamentsManager(DiscordGuild guild)
+        {
+            return this.GlobalManager.GetOrAdd(guild.Id, CreateTournamentsManager);
         }
     }
 }

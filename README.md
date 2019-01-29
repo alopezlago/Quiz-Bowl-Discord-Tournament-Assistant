@@ -3,19 +3,23 @@ https://discordapp.com/oauth2/authorize?client_id=505827616469680129&scope=bot
 
 Temporary invite: https://discord.gg/6tQvfT
 
-Need to add try/catch handlers so we don't blow up on exceptions
-
 The bot needs to have all of these permissions (give it a role), because it needs to grant readers these permissions:
 
-UseVoiceDetection
-UseVoice
-Speak
-SendMessages
-KickMembers
-MuteMembers
-DeafenMembers
-AddReactions
-PrioritySpeaker (256)
+Use Voice Activity (UseVoiceDetection)
+Manage Roles (ManageRoles)
+Kick Members (KickMembers)
+Read Text Channels & See Voice Channels
+Send Messages (SendMessages)
+Read Message History
+Add Reactions (AddReactions)
+Connect (UseVoice)
+Speak (Speak)
+Mute Members (MuteMembers)
+Defean Members (DeafenMembers)
+Priority Speaker (PrioritySpeaker, 256)
+
+These may be needed:
+Manage Emojis (ManageEmojis)
 
 
 Starting a tournament:
@@ -35,8 +39,9 @@ Starting a tournament:
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
 
 
+TODO: Add error code to TrySetTournament to make the error message better.
+TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Write guide for how to start a tournament as a TD
-TODO: Add multi-guild support
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs.
 TODO: Track member name changes so we can update reader/player names.
 TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier.
