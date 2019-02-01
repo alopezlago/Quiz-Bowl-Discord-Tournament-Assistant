@@ -91,11 +91,12 @@ namespace QBDiscordAssistant.Tournament
             return this.pendingTournaments.TryGetValue(name, out state);
         }
 
-        public bool TrySetCurrentTournament(string name)
+        public bool TrySetCurrentTournament(string name, out string errorMessage)
         {
             if (!(this.currentTournamentLock.TryEnterUpgradeableReadLock(mutexTimeoutMs) &&
                 this.currentTournamentLock.TryEnterWriteLock(mutexTimeoutMs)))
             {
+                errorMessage = "Can't get access to the current tournament right now. Try again later.";
                 return false;
             }
 
@@ -103,11 +104,13 @@ namespace QBDiscordAssistant.Tournament
             {
                 if (this.CurrentTournament != null)
                 {
+                    errorMessage = $"The tournament '{this.CurrentTournament.Name}' is already running. Use !end to stop it.";
                     return false;
                 }
 
                 if (!this.pendingTournaments.TryGetValue(name, out ITournamentState state))
                 {
+                    errorMessage = $"A tournament with the name '{name}' cannot be found.";
                     return false;
                 }
 
@@ -116,10 +119,12 @@ namespace QBDiscordAssistant.Tournament
                 if (!this.pendingTournaments.TryRemove(name, out state))
                 {
                     // Couldn't set the current tournament, so roll back the change
+                    errorMessage = $"The tournament '{this.CurrentTournament.Name}' couldn't be moved from pending to current. Try again later.";
                     this.CurrentTournament = null;
                     return false;
                 }
 
+                errorMessage = null;
                 return true;
             }
             finally

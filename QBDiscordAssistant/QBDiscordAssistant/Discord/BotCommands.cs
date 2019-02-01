@@ -146,10 +146,10 @@ namespace QBDiscordAssistant.Discord
                     $"You do not have permissions to set up that tournament in guild '{context.Guild.Name}'.");
             }
 
-            if (!manager.TrySetCurrentTournament(tournamentName))
+            if (!manager.TrySetCurrentTournament(tournamentName, out string errorMessage))
             {
                 return context.Member.SendMessageAsync(
-                    $"That tournament can't be set up right now. Another tournament may be currently running in guild '{context.Guild.Name}'. If one isn't being run, try the command again.");
+                    $"Error setting the current tournament in guild '{context.Guild.Name}'. {errorMessage}");
             }
 
             return DoReadWriteActionOnCurrentTournament(context,

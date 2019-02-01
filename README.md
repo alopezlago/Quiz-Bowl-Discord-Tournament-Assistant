@@ -39,14 +39,14 @@ Starting a tournament:
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
 
 
-TODO: Add error code to TrySetTournament to make the error message better.
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Write guide for how to start a tournament as a TD
-TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs.
+TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
 TODO: Track member name changes so we can update reader/player names.
-TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier.
+TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier. This would be a major change (v2?)
 TODO: Have an option to allow for more automation, that would enable:
   - !win <team> in the channel would track who won that game, and would grant them permissions for the next room.
   - Tracking player buzzes. Either use a queue and clear on a score (0/10/15, etc.), or store a timestamp of the last buzz in the channel and mention the user if it's been long enough.
   - Longer term, potentially look at merging with the tournament runner and tracking all of the events.
+  - This would be a major change (v3?)
   
