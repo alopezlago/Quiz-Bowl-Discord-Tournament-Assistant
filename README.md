@@ -37,10 +37,13 @@ Starting a tournament:
   7. Start the tournament with !start.
     !start
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms.
+  9. If you need to set up a finals room, use the !finals command.
+    !finals @Reader Team1, Team2
+  10. To end the tournament, use !end
+    !end
 
 
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
-TODO: Write guide for how to start a tournament as a TD
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
 TODO: Track member name changes so we can update reader/player names.
 TODO: Look into migrating to [Discord.Net](https://github.com/RogueException/Discord.Net/releases), which is still maintained. It looks like it uses interfaces too, which should make unit testing easier. This would be a major change (v2?)
