@@ -9,7 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant.DiscordBot.DSharpPlus
 {
     public class BotCommands
     {
@@ -700,7 +700,7 @@ namespace QBDiscordAssistant.Discord
             CommandContext context, DiscordChannel parent, TournamentRoles roles, Reader reader)
         {
             string name = GetVoiceRoomName(reader);
-            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, DSharpPlus.ChannelType.Voice, parent);
+            DiscordChannel channel = await context.Guild.CreateChannelAsync(name, ChannelType.Voice, parent);
             return channel;
         }
 

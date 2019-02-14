@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant.DiscordBot.DSharpPlus
 {
     public class BotEventHandler : IDisposable
     {

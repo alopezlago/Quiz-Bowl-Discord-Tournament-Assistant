@@ -3,7 +3,7 @@ using QBDiscordAssistant.Tournament;
 using System;
 using System.Threading.Tasks;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant.DiscordBot.DSharpPlus
 {
     internal static class TournamentsManagerExtensions
     {

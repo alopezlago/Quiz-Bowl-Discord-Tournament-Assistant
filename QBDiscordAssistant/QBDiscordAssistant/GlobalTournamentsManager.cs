@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant
 {
     // Maps between guilds and tournaments managers
     // Do we need to lock this too? Or we could use a ConcurrentDictionary.

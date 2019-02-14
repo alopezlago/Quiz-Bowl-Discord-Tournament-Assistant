@@ -1,19 +1,13 @@
 ﻿using DSharpPlus;
 using DSharpPlus.CommandsNext;
-using QBDiscordAssistant.Tournament;
 using System;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant.DiscordBot.DSharpPlus
 {
     public class Bot : IDisposable
     {
-        // TODO: Right now this will only work on one guild. Add support for multiple guilds so we can host multiple
-        // Discord tournaments on the same day.
-
-        private static readonly Regex BuzzRegex = new Regex("^bu?z+$", RegexOptions.IgnoreCase);
-
         private readonly BotConfiguration options;
         private readonly DiscordClient discordClient;
         private readonly CommandsNextModule commandsModule;

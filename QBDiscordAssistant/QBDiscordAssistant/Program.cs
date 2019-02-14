@@ -1,10 +1,6 @@
 using Newtonsoft.Json;
-using QBDiscordAssistant.Discord;
-using System;
-using System.Collections.Generic;
+using QBDiscordAssistant.DiscordBot.DSharpPlus;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace QBDiscordAssistant
@@ -21,7 +17,7 @@ namespace QBDiscordAssistant
         {
 
             BotConfiguration configuration = await GetConfiguration();
-            using (Bot bot = new Bot(configuration))
+            using (DiscordBot.DiscordNet.Bot bot = new DiscordBot.DiscordNet.Bot(configuration))
             {
                 await bot.ConnectAsync();
 

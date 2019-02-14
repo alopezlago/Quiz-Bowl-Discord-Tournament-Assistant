@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace QBDiscordAssistant.Discord
+namespace QBDiscordAssistant
 {
     // TODO: Look into whether we want this to be an instance class. For now match the behavior in the shared locations
     // and treat this as a static method.
