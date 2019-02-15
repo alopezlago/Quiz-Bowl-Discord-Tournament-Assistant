@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using QBDiscordAssistant.DiscordBot.DSharpPlus;
 using System.IO;
 using System.Threading.Tasks;
 

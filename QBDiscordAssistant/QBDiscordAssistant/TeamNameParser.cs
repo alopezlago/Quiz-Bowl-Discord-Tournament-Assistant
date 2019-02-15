@@ -15,6 +15,12 @@ namespace QBDiscordAssistant
             errorMessage = null;
             teamNames = new HashSet<string>();
 
+            if (string.IsNullOrEmpty(combinedTeamNames))
+            {
+                // 0 teams is acceptable.
+                return true;
+            }
+
             bool possibleCommaEscapeStart = false;
             int startIndex = 0;
             int length;
