@@ -10,5 +10,10 @@ namespace QBDiscordAssistant.Tournament
         }
 
         public IList<Game> Games { get; private set; }
+
+        public override string ToString()
+        {
+            return $"Round games: {string.Join(";", this.Games)}";
+        }
     }
 }

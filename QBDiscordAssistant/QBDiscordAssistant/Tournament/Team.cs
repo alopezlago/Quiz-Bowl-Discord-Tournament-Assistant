@@ -21,5 +21,10 @@ namespace QBDiscordAssistant.Tournament
         {
             return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode();
         }
+
+        public override string ToString()
+        {
+            return $"Team {this.Name}";
+        }
     }
 }

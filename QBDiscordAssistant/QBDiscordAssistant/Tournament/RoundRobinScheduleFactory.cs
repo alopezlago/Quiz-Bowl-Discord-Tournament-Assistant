@@ -9,18 +9,17 @@ namespace QBDiscordAssistant.Tournament
 
         public RoundRobinScheduleFactory(int roundRobins)
         {
-            if (roundRobins <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(roundRobins), $"roundRobins must be positive. Value: {roundRobins}");
-            }
-
             this.roundRobins = roundRobins;
         }
 
         public Schedule Generate(ISet<Team> teams, ISet<Reader> readers)
         {
-            if (teams.Count <= 1)
+            if (roundRobins <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(roundRobins), $"roundRobins must be positive. Value: {roundRobins}");
+            }
+            else if (teams.Count <= 1)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(teams), $"Must have more than 1 team. Count: {teams.Count}");
@@ -104,7 +103,7 @@ namespace QBDiscordAssistant.Tournament
         private static void RotateCells(Team[] topRow, Team[] bottomRow)
         {
             // Circle method rotation: have two rows and fix the first number in the table. For each rotation:
-            // - Push numbers in the top row to the right, and push numbers in the bottom row to the left.
+            // - Push numbers in the top row to the right, and push numbers in the bottom row to the left (clockwise)
             //    - If a number leaves the top row, put it at the end of the bottom row.
             //    - If a number leaves the bottom row, put it at the start of the top row.
             //    - If a bye is needed (odd number of teams), use a dummy team (null) to indicate which team gets the
@@ -122,12 +121,14 @@ namespace QBDiscordAssistant.Tournament
 
             // Push teams. We want to skip the first cell in the top row, so do > 1, since 1 should belong to the
             // team leaving the bottom row.
-
-            topRow[topRow.Length - 1] = leavingBottomRowTeam;
-            for (int j = topRow.Length - 2; j > 1; j--)
+            for (int j = topRow.Length - 1; j > 1; j--)
             {
                 topRow[j] = topRow[j - 1];
             }
+
+            // 0 is the fixed element, so go to the next one. We return early if there's only one element in the top
+            // row, so there's no danger of an index-out-of-bounds exception
+            topRow[1] = leavingBottomRowTeam;
 
             for (int j = 0; j < bottomRow.Length - 1; j++)
             {
@@ -138,3 +139,26 @@ namespace QBDiscordAssistant.Tournament
         }
     }
 }
+
+// Note: one possible optimization in Schedule would be to generate the rounds once, then add the first set of rounds
+// this.roundRobins number of times. The downside is that the Round objects (and Game objects in them) are all the same,
+// so if we decide to include unique information in them (maybe round number or events), we'll have to fall back to the
+// original approach. Here is the code to reuse the rounds:
+////Schedule schedule = new Schedule();
+////bool hasBye = teams.Count % 2 == 1;
+////int roundsCount = hasBye ? teams.Count : teams.Count - 1;
+////Round[] rounds2 = new Round[roundsCount];
+////for (int i = 0; i<rounds2.Length; i++)
+////{
+////    Round round = GenerateRound(i, topRow, bottomRow, readers, hasBye);
+////schedule.AddRound(round);
+////    rounds2[i] = round;
+////}
+
+////for (int roundRobinsCount = 1; roundRobinsCount< this.roundRobins; roundRobinsCount++)
+////{
+////    for (int i = 0; i<rounds2.Length; i++)
+////    {
+////        schedule.AddRound(rounds2[i]);
+////    }
+////}

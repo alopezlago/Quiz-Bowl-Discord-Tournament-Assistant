@@ -17,5 +17,10 @@ namespace QBDiscordAssistant.Tournament
         {
             this.Rounds.Add(round);
         }
+
+        public override string ToString()
+        {
+            return $"Scheduled games:\n{string.Join("\n", this.Rounds)}";
+        }
     }
 }

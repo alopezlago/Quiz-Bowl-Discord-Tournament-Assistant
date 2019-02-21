@@ -24,5 +24,10 @@ namespace QBDiscordAssistant.Tournament
         {
             return this.Id.GetHashCode();
         }
+
+        public override string ToString()
+        {
+            return $"Reader {this.Name} (#{this.Id})";
+        }
     }
 }
