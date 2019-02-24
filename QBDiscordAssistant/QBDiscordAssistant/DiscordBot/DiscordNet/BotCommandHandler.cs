@@ -93,7 +93,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             manager.AddOrUpdateTournament(
                 tournamentName,
-                new TournamentState(this.Context.Guild.Id, tournamentName), (name, tournamentState) =>
+                state,
+                (name, tournamentState) =>
                 {
                     updateSuccessful = tournamentState.TryAddDirector(newDirector.Id);
                     return tournamentState;

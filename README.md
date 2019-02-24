@@ -44,6 +44,8 @@ Starting a tournament:
     !end
 
 
+TODO: Add unit testing
+TODO: Add resx file to make unit testing more effective (can look up message string)
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Look into adding more logging.
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
