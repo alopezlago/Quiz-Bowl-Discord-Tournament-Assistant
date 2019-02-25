@@ -14,7 +14,8 @@ namespace QBDiscordAssistantTests
     [TestClass]
     public class AdminBotCommandHandlerTests
     {
-        public const ulong GuildId = 123456;
+        const ulong GuildId = 123456;
+        const string GuildName = "GuildName";
         const string TournamentName = "New Tournament";
 
         [TestMethod]
@@ -29,7 +30,9 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(userId);
             await commandHandler.AddTournamentDirector(guildUser, TournamentName);
-            messageStore.VerifyMessages(1);
+            string expectedMessage = string.Format(
+                BotStrings.AddTournamentDirectorSuccessful, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -51,7 +54,9 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(secondUserId);
             await commandHandler.AddTournamentDirector(guildUser, TournamentName);
-            messageStore.VerifyMessages(1);
+            string expectedMessage = string.Format(
+                BotStrings.AddTournamentDirectorSuccessful, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -73,7 +78,8 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(userId);
             await commandHandler.RemoveTournamentDirector(guildUser, TournamentName);
-            messageStore.VerifyMessages(1);
+            string expectedMessage = string.Format(BotStrings.RemovedTournamentDirector, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -123,6 +129,9 @@ namespace QBDiscordAssistantTests
             mockGuild
                 .Setup(guild => guild.Id)
                 .Returns(GuildId);
+            mockGuild
+                .Setup(guild => guild.Name)
+                .Returns(GuildName);
             mockContext
                 .Setup(context => context.Guild)
                 .Returns(mockGuild.Object);
@@ -151,21 +160,14 @@ namespace QBDiscordAssistantTests
 
             public List<string> DirectMessages { get; }
 
-            public void VerifyMessages(IEnumerable<string> directMessages)
+            public void VerifyMessages(params string[] directMessages)
             {
-                Assert.AreEqual(directMessages.Count(), this.DirectMessages.Count, "Unexpected number of DMs.");
-                int index = 0;
-                foreach (string message in directMessages)
+                Assert.AreEqual(directMessages.Length, this.DirectMessages.Count, "Unexpected number of DMs.");
+                for (int i = 0; i < directMessages.Length; i++)
                 {
-                    Assert.AreEqual(message, this.DirectMessages[index], $"Unexpected DM at index {index}");
-                    index++;
+                    string message = directMessages[i];
+                    Assert.AreEqual(message, this.DirectMessages[i], $"Unexpected DM at index {i}");
                 }
-            }
-
-            // TODO: Add channel message counts.
-            public void VerifyMessages(int directMessagesCount)
-            {
-                Assert.AreEqual(directMessagesCount, this.DirectMessages.Count, "Unexpected number of DMs.");
             }
         }
     }

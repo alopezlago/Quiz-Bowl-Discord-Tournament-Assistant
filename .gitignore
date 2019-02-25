@@ -263,3 +263,4 @@ __pycache__/
 # config and token should be ignored
 QBDiscordAssistant/QBDiscordAssistant/config.txt
 QBDiscordAssistant/QBDiscordAssistant/discordToken.txt
+/QBDiscordAssistant/QBDiscordAssistant/DiscordBot/DiscordNet/BotStrings.Designer.cs
