@@ -11,9 +11,11 @@ using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
 {
+    // TODO: Refactor test methods to remove most of the shared code (initialization, message verification)
     [TestClass]
     public class AdminBotCommandHandlerTests
     {
+        const ulong DefaultUserId = 1234;
         const ulong GuildId = 123456;
         const string GuildName = "GuildName";
         const string TournamentName = "New Tournament";
@@ -21,14 +23,13 @@ namespace QBDiscordAssistantTests
         [TestMethod]
         public async Task AddTournamentDirector()
         {
-            const ulong userId = 1234;
             MessageStore messageStore = new MessageStore();
             ICommandContext context = CreateCommandContext(messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(userId);
+            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirector(guildUser, TournamentName);
             string expectedMessage = string.Format(
                 BotStrings.AddTournamentDirectorSuccessful, TournamentName, GuildName);
@@ -37,7 +38,7 @@ namespace QBDiscordAssistantTests
             TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
             Assert.IsTrue(
                 manager.TryGetTournament(TournamentName, out ITournamentState state), "Could not find tournament.");
-            Assert.IsTrue(state.IsDirector(userId), "Director was not added.");
+            Assert.IsTrue(state.IsDirector(DefaultUserId), "Director was not added.");
         }
 
         [TestMethod]
@@ -66,17 +67,38 @@ namespace QBDiscordAssistantTests
         }
 
         [TestMethod]
-        public async Task RemoveTournamentDirector()
+        public async Task AddSameTournamentDirectors()
         {
-            const ulong userId = 1234;
             MessageStore messageStore = new MessageStore();
             ICommandContext context = CreateCommandContext(messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
-            AddTournamentDirectorDirectly(globalManager, userId);
+            AddTournamentDirectorDirectly(globalManager, DefaultUserId);
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(userId);
+            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
+            await commandHandler.AddTournamentDirector(guildUser, TournamentName);
+            string expectedMessage = string.Format(
+                BotStrings.UserAlreadyTournamentDirector, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
+
+            TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
+            Assert.IsTrue(
+                manager.TryGetTournament(TournamentName, out ITournamentState state), "Could not find tournament.");
+            Assert.IsTrue(state.IsDirector(DefaultUserId), "User should still be a director.");
+        }
+
+        [TestMethod]
+        public async Task RemoveTournamentDirector()
+        {
+            MessageStore messageStore = new MessageStore();
+            ICommandContext context = CreateCommandContext(messageStore);
+            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
+            AddTournamentDirectorDirectly(globalManager, DefaultUserId);
+
+            BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
+
+            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
             await commandHandler.RemoveTournamentDirector(guildUser, TournamentName);
             string expectedMessage = string.Format(BotStrings.RemovedTournamentDirector, TournamentName, GuildName);
             messageStore.VerifyMessages(expectedMessage);
@@ -84,11 +106,46 @@ namespace QBDiscordAssistantTests
             TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
             Assert.IsTrue(
                 manager.TryGetTournament(TournamentName, out ITournamentState state), "Could not find tournament.");
-            Assert.IsFalse(state.IsDirector(userId), "Director was not removed.");
+            Assert.IsFalse(state.IsDirector(DefaultUserId), "Director was not removed.");
         }
 
-        // TODO: Add test for the case where the tournament doesn't exist. May want a message then.
-        // TODO: Add resource file to hold message strings. Then compare messages sent to resource file.
+        [TestMethod]
+        public async Task RemoveNonexistentTournamentDirector()
+        {
+            const ulong otherId = DefaultUserId + 1;
+            MessageStore messageStore = new MessageStore();
+            ICommandContext context = CreateCommandContext(messageStore);
+            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
+            BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
+            AddTournamentDirectorDirectly(globalManager, DefaultUserId);
+
+            IGuildUser guildUser = CreateGuildUser(otherId);
+            await commandHandler.RemoveTournamentDirector(guildUser, TournamentName);
+            string expectedMessage = string.Format(BotStrings.UserNotTournamentDirector, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
+
+            TournamentsManager manager = globalManager.GetOrAdd(GuildId, id => new TournamentsManager());
+            Assert.IsTrue(
+                manager.TryGetTournament(TournamentName, out ITournamentState state), "Could not find tournament.");
+            Assert.IsFalse(state.IsDirector(otherId), "Director should not have been added.");
+        }
+
+        [TestMethod]
+        public async Task RemoveFromNonexistentTournament()
+        {
+            const ulong otherId = DefaultUserId + 1;
+            MessageStore messageStore = new MessageStore();
+            ICommandContext context = CreateCommandContext(messageStore);
+            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
+            BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
+
+            IGuildUser guildUser = CreateGuildUser(otherId);
+            await commandHandler.RemoveTournamentDirector(guildUser, TournamentName);
+            string expectedMessage = string.Format(BotStrings.TournamentDoesNotExist, TournamentName, GuildName);
+            messageStore.VerifyMessages(expectedMessage);
+        }
+
+        // TODO: Add test for ClearAll that checks that all artifacts are cleared.
 
         private static void AddTournamentDirectorDirectly(GlobalTournamentsManager globalManager, ulong userId)
         {

@@ -268,7 +268,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Team {0} does not exist..
+        ///   Looks up a localized string similar to Team &apos;{0}&apos; does not exist..
         /// </summary>
         public static string TeamDoesNotExist {
             get {
@@ -291,6 +291,15 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         public static string TournamentCleanupFinished {
             get {
                 return ResourceManager.GetString("TournamentCleanupFinished", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tournament &apos;{0}&apos; does not exist..
+        /// </summary>
+        public static string TournamentDoesNotExist {
+            get {
+                return ResourceManager.GetString("TournamentDoesNotExist", resourceCulture);
             }
         }
         

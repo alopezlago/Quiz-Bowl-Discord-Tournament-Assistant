@@ -354,12 +354,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             // TODO: Harden this. Since it's not guaranteed to be the current tournament, we can't use the helper
             // methods
+            IDMChannel dmChannel = await this.Context.User.GetOrCreateDMChannelAsync();
             if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
             {
+                await dmChannel.SendMessageAsync(
+                    string.Format(BotStrings.TournamentDoesNotExist, tournamentName, this.Context.Guild.Name));
                 return;
             }
 
-            IDMChannel dmChannel = await this.Context.User.GetOrCreateDMChannelAsync();
             if (state.TryRemoveDirector(oldDirector.Id))
             {
                 await dmChannel.SendMessageAsync(

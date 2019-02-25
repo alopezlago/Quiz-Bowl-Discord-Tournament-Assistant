@@ -187,13 +187,16 @@
     <value>Removed tournament director from tournament '{0}' in guild '{1}'.</value>
   </data>
   <data name="TeamDoesNotExist" xml:space="preserve">
-    <value>Team {0} does not exist.</value>
+    <value>Team '{0}' does not exist.</value>
   </data>
   <data name="ThisCommandCanOnlyBeUsedWhileTournamentRunning" xml:space="preserve">
     <value>This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.</value>
   </data>
   <data name="TournamentCleanupFinished" xml:space="preserve">
     <value>Tournament cleanup finished in guild '{0}'.</value>
+  </data>
+  <data name="TournamentDoesNotExist" xml:space="preserve">
+    <value>Tournament '{0}' does not exist.</value>
   </data>
   <data name="TournamentHasStarted" xml:space="preserve">
     <value>{0}: tournament has started.</value>
