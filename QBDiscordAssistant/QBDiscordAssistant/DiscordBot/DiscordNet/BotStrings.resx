@@ -204,6 +204,9 @@
   <data name="TournamentWasNotRemoved" xml:space="preserve">
     <value>Tournament was not removed from the list of pending tournaments. Try the command again.</value>
   </data>
+  <data name="UnableToPerformCommand" xml:space="preserve">
+    <value>Unable to perform command. {0}</value>
+  </data>
   <data name="UnknownErrorRemovingOldReader" xml:space="preserve">
     <value>Unknown error when trying to remove the old reader.</value>
   </data>

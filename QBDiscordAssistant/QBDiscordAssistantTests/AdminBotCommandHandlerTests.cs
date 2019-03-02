@@ -5,8 +5,7 @@ using Moq;
 using QBDiscordAssistant;
 using QBDiscordAssistant.DiscordBot.DiscordNet;
 using QBDiscordAssistant.Tournament;
-using System.Collections.Generic;
-using System.Linq;
+using QBDiscordAssistantTests.Utilities;
 using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
@@ -24,7 +23,7 @@ namespace QBDiscordAssistantTests
         public async Task AddTournamentDirector()
         {
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
@@ -47,7 +46,7 @@ namespace QBDiscordAssistantTests
             const ulong firstUserId = 123;
             const ulong secondUserId = 1234;
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             AddTournamentDirectorDirectly(globalManager, firstUserId);
 
@@ -70,7 +69,7 @@ namespace QBDiscordAssistantTests
         public async Task AddSameTournamentDirectors()
         {
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             AddTournamentDirectorDirectly(globalManager, DefaultUserId);
 
@@ -92,7 +91,7 @@ namespace QBDiscordAssistantTests
         public async Task RemoveTournamentDirector()
         {
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             AddTournamentDirectorDirectly(globalManager, DefaultUserId);
 
@@ -114,7 +113,7 @@ namespace QBDiscordAssistantTests
         {
             const ulong otherId = DefaultUserId + 1;
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
             AddTournamentDirectorDirectly(globalManager, DefaultUserId);
@@ -135,7 +134,7 @@ namespace QBDiscordAssistantTests
         {
             const ulong otherId = DefaultUserId + 1;
             MessageStore messageStore = new MessageStore();
-            ICommandContext context = CreateCommandContext(messageStore);
+            ICommandContext context = MockICommandContextFactory.CreateCommandContext(GuildId, GuildName, messageStore);
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
@@ -162,43 +161,6 @@ namespace QBDiscordAssistantTests
             Assert.IsTrue(state.TryAddDirector(userId), "First TD added should occur.");
         }
 
-        private static ICommandContext CreateCommandContext(MessageStore messageStore)
-        {
-            Mock<IUserMessage> mockUserMessage = new Mock<IUserMessage>();
-
-            Mock<IDMChannel> mockDmChannel = new Mock<IDMChannel>();
-            mockDmChannel
-                .Setup(dmChannel => dmChannel.SendMessageAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<Embed>(), null))
-                .Returns<string, bool, Embed, RequestOptions>((message, isTTS, embed, options) =>
-                {
-                    messageStore.DirectMessages.Add(message);
-                    return Task.FromResult(mockUserMessage.Object);
-                });
-
-            Mock<IUser> mockUser = new Mock<IUser>();
-            mockUser
-                .Setup(user => user.GetOrCreateDMChannelAsync(null))
-                .Returns(Task.FromResult(mockDmChannel.Object));
-
-            Mock<ICommandContext> mockContext = new Mock<ICommandContext>();
-
-            Mock<IGuild> mockGuild = new Mock<IGuild>();
-            mockGuild
-                .Setup(guild => guild.Id)
-                .Returns(GuildId);
-            mockGuild
-                .Setup(guild => guild.Name)
-                .Returns(GuildName);
-            mockContext
-                .Setup(context => context.Guild)
-                .Returns(mockGuild.Object);
-            mockContext
-                .Setup(context => context.User)
-                .Returns(mockUser.Object);
-
-            return mockContext.Object;
-        }
-
         private static IGuildUser CreateGuildUser(ulong userId)
         {
             Mock<IGuildUser> mockGuildUser = new Mock<IGuildUser>();
@@ -206,26 +168,6 @@ namespace QBDiscordAssistantTests
                 .Setup(user => user.Id)
                 .Returns(userId);
             return mockGuildUser.Object;
-        }
-
-        private class MessageStore
-        {
-            public MessageStore()
-            {
-                this.DirectMessages = new List<string>();
-            }
-
-            public List<string> DirectMessages { get; }
-
-            public void VerifyMessages(params string[] directMessages)
-            {
-                Assert.AreEqual(directMessages.Length, this.DirectMessages.Count, "Unexpected number of DMs.");
-                for (int i = 0; i < directMessages.Length; i++)
-                {
-                    string message = directMessages[i];
-                    Assert.AreEqual(message, this.DirectMessages[i], $"Unexpected DM at index {i}");
-                }
-            }
         }
     }
 }

@@ -322,6 +322,15 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Unable to perform command. {0}.
+        /// </summary>
+        public static string UnableToPerformCommand {
+            get {
+                return ResourceManager.GetString("UnableToPerformCommand", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Unknown error when trying to remove the old reader..
         /// </summary>
         public static string UnknownErrorRemovingOldReader {
