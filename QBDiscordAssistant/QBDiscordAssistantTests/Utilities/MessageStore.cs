@@ -3,22 +3,51 @@ using System.Collections.Generic;
 
 namespace QBDiscordAssistantTests.Utilities
 {
-    class MessageStore
+    public class MessageStore
     {
         public MessageStore()
         {
+            this.ChannelEmbeds = new List<string>();
+            this.ChannelMessages = new List<string>();
             this.DirectMessages = new List<string>();
         }
 
-        public List<string> DirectMessages { get; }
+        public IList<string> ChannelEmbeds { get; }
 
-        public void VerifyMessages(params string[] directMessages)
+        // We could add the channel name too, but for now we always reply to the same channel
+        public IList<string> ChannelMessages { get; }
+
+        public IList<string> DirectMessages { get; }
+
+        public void Clear()
         {
-            Assert.AreEqual(directMessages.Length, this.DirectMessages.Count, "Unexpected number of DMs.");
-            for (int i = 0; i < directMessages.Length; i++)
+            this.ChannelEmbeds.Clear();
+            this.ChannelMessages.Clear();
+            this.DirectMessages.Clear();
+        }
+
+        public void VerifyChannelEmbeds(params string[] channelEmbed)
+        {
+            VerifyMessages(this.ChannelEmbeds, channelEmbed, "channel message");
+        }
+
+        public void VerifyChannelMessages(params string[] channelMessages)
+        {
+            VerifyMessages(this.ChannelMessages, channelMessages, "channel message");
+        }
+
+        public void VerifyDirectMessages(params string[] directMessages)
+        {
+            VerifyMessages(this.DirectMessages, directMessages, "DM");
+        }
+
+        private static void VerifyMessages(IList<string> messages, string[] expectedMessages, string messageType)
+        {
+            Assert.AreEqual(expectedMessages.Length, messages.Count, $"Unexpected number of {messageType}s.");
+            for (int i = 0; i < expectedMessages.Length; i++)
             {
-                string message = directMessages[i];
-                Assert.AreEqual(message, this.DirectMessages[i], $"Unexpected DM at index {i}");
+                string message = expectedMessages[i];
+                Assert.AreEqual(message, messages[i], $"Unexpected {messageType} at index {i}");
             }
         }
     }

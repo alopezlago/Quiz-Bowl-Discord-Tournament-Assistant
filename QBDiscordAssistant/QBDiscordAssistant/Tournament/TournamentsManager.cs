@@ -28,14 +28,14 @@ namespace QBDiscordAssistant.Tournament
         {
             if (!this.currentTournamentLock.TryEnterReadLock(mutexTimeoutMs))
             {
-                return Result<T>.CreateFailureResult("Unable to get access to the current tournament.");
+                return Result<T>.CreateFailureResult(TournamentStrings.UnableAccessCurrentTournament);
             }
 
             try
             {
                 if (this.CurrentTournament == null)
                 {
-                    return Result<T>.CreateFailureResult("No current tournament is running.");
+                    return Result<T>.CreateFailureResult(TournamentStrings.NoCurrentTournamentRunning);
                 }
 
                 T result = tournamentStateFunc(this.CurrentTournament);
@@ -47,18 +47,28 @@ namespace QBDiscordAssistant.Tournament
             }
         }
 
+        public bool TryReadActionOnCurrentTournament(Action<IReadOnlyTournamentState> tournamentStateAction)
+        {
+            Func<IReadOnlyTournamentState, bool> tournamentStateFunc = (state) =>
+            {
+                tournamentStateAction(state);
+                return true;
+            };
+            return this.TryReadActionOnCurrentTournament<bool>(tournamentStateFunc).Success;
+        }
+
         public Result<T> TryReadWriteActionOnCurrentTournament<T>(Func<ITournamentState, T> tournamentStateTask)
         {
             if (!this.currentTournamentLock.TryEnterWriteLock(mutexTimeoutMs))
             {
-                return Result<T>.CreateFailureResult("Unable to get access to the current tournament.");
+                return Result<T>.CreateFailureResult(TournamentStrings.UnableAccessCurrentTournament);
             }
 
             try
             {
                 if (this.CurrentTournament == null)
                 {
-                    return Result<T>.CreateFailureResult("No current tournament is running.");
+                    return Result<T>.CreateFailureResult(TournamentStrings.NoCurrentTournamentRunning);
                 }
 
                 T result = tournamentStateTask(this.CurrentTournament);
@@ -96,7 +106,7 @@ namespace QBDiscordAssistant.Tournament
             if (!(this.currentTournamentLock.TryEnterUpgradeableReadLock(mutexTimeoutMs) &&
                 this.currentTournamentLock.TryEnterWriteLock(mutexTimeoutMs)))
             {
-                errorMessage = "Can't get access to the current tournament right now. Try again later.";
+                errorMessage = TournamentStrings.UnableAccessCurrentTournament;
                 return false;
             }
 
@@ -104,13 +114,14 @@ namespace QBDiscordAssistant.Tournament
             {
                 if (this.CurrentTournament != null)
                 {
-                    errorMessage = $"The tournament '{this.CurrentTournament.Name}' is already running. Use !end to stop it.";
+                    errorMessage = string.Format(
+                        TournamentStrings.TournamentAlreadyRunning, this.CurrentTournament.Name);
                     return false;
                 }
 
                 if (!this.pendingTournaments.TryGetValue(name, out ITournamentState state))
                 {
-                    errorMessage = $"A tournament with the name '{name}' cannot be found.";
+                    errorMessage = string.Format(TournamentStrings.TournamentCannotBeFound, name);
                     return false;
                 }
 
@@ -119,7 +130,8 @@ namespace QBDiscordAssistant.Tournament
                 if (!this.pendingTournaments.TryRemove(name, out state))
                 {
                     // Couldn't set the current tournament, so roll back the change
-                    errorMessage = $"The tournament '{this.CurrentTournament.Name}' couldn't be moved from pending to current. Try again later.";
+                    errorMessage = string.Format(
+                        TournamentStrings.CannotMoveTournamentFromPending, this.CurrentTournament.Name);
                     this.CurrentTournament = null;
                     return false;
                 }

@@ -17,16 +17,16 @@ namespace QBDiscordAssistant.Tournament
             if (roundRobins <= 0)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(roundRobins), $"roundRobins must be positive. Value: {roundRobins}");
+                    nameof(roundRobins), string.Format(TournamentStrings.RoundRobinsMustBePositive, roundRobins));
             }
             else if (teams.Count <= 1)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(teams), $"Must have more than 1 team. Count: {teams.Count}");
+                    nameof(teams), string.Format(TournamentStrings.MustHaveMoreThanOneTeam, teams.Count));
             }
             else if (readers.Count == 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(readers), $"Must have a reader.");
+                throw new ArgumentOutOfRangeException(nameof(readers), TournamentStrings.MustHaveReader);
             }
 
             Schedule schedule = new Schedule();

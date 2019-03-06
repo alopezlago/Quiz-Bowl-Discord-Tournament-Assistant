@@ -319,6 +319,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 return;
             }
+            else if (!teamsAndPlayers.Any())
+            {
+                await this.SendUserMessage(BotStrings.NoTeamsYet);
+                return;
+            }
 
             // TODO: Look into using an embed. Embeds have 25-field limits, so use newlines in a message
             // for now to simplify the logic (no message splitting).
@@ -391,7 +396,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             return this.DoReadWriteActionOnCurrentTournament(
-                currentTournament => UpdateStage(currentTournament, TournamentStage.AddReaders));
+                currentTournament => this.UpdateStage(currentTournament, TournamentStage.AddReaders));
         }
 
         public async Task Start()

@@ -196,29 +196,30 @@ namespace QBDiscordAssistant.Tournament
             switch (newStage)
             {
                 case TournamentStage.AddReaders:
-                    nextStageTitle = "Add Readers";
-                    nextStageInstructions = "List the mentions of all of the readers. For example, '@Reader_1 @Reader_2 @Reader_3'. If you forgot a reader, you can still use !addReaders during the add teams phase.";
+                    nextStageTitle = TournamentStrings.AddReaders;
+                    nextStageInstructions = TournamentStrings.ListMentionsOfAllReaders;
                     break;
                 case TournamentStage.SetRoundRobins:
-                    nextStageTitle = "Set the number of round robins";
-                    nextStageInstructions = $"Specify the number of round-robin rounds as an integer (from 1 to {MaxRoundRobins}).";
+                    nextStageTitle = TournamentStrings.SetNumberRoundRobins;
+                    nextStageInstructions = string.Format(TournamentStrings.SpecifyNumberRoundRobins, MaxRoundRobins);
                     break;
                 case TournamentStage.AddTeams:
-                    nextStageTitle = "Add Teams";
+                    nextStageTitle = TournamentStrings.AddTeams;
                     nextStageInstructions =
-                        $"Add a list of comma-separated team names. If the team name has a comma, use another comma to escape it (like ,,). You can add a maximum of {this.GetMaximumTeamCount()} teams.";
+                        string.Format(TournamentStrings.AddListCommaSeparatedTeams, this.GetMaximumTeamCount());
                     break;
                 case TournamentStage.BotSetup:
-                    nextStageTitle = "Setting up the tournament";
-                    nextStageInstructions = "Initializing the schedule. Channels and roles will be set up next.";
+                    nextStageTitle = TournamentStrings.SettingUpTournament;
+                    nextStageInstructions = TournamentStrings.InitializingSchedule;
                     break;
                 case TournamentStage.RunningPrelims:
-                    nextStageTitle = "Tournament Started";
-                    nextStageInstructions = $"Tournament '{this.Name}' has started. Go to your first round room and follow the instructions.";
+                    nextStageTitle = TournamentStrings.TournamentStarted;
+                    nextStageInstructions = string.Format(TournamentStrings.TournamentStartedDirections, this.Name);
                     break;
                 case TournamentStage.Complete:
-                    nextStageTitle = "Tournament Completed";
-                    nextStageInstructions = $"All tournament channels and roles removed. Tournament '{this.Name}' is now finished.";
+                    nextStageTitle = TournamentStrings.TournamentCompleted;
+                    nextStageInstructions = string.Format(
+                        TournamentStrings.AllTournamentChannelsRolesRemoved, this.Name);
                     break;
                 default:
                     nextStageTitle = null;

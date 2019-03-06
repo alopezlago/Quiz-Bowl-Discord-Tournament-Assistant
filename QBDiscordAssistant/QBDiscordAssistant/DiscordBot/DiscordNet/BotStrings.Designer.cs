@@ -223,6 +223,15 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No teams have been created yet..
+        /// </summary>
+        public static string NoTeamsYet {
+            get {
+                return ResourceManager.GetString("NoTeamsYet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Player {0} is already on a team..
         /// </summary>
         public static string PlayerIsAlreadyOnTeam {
