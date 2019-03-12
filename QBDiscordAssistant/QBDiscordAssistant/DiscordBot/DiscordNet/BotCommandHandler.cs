@@ -5,8 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Game = QBDiscordAssistant.Tournament.Game;
+
+[assembly: InternalsVisibleTo("QBDiscordAssistantTests")]
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -15,7 +18,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private const string DirectorRoleName = "Director";
         private const string ReaderRoomRolePrefix = "Reader_Room_";
         private const string TeamRolePrefix = "Team_";
-        private static readonly GuildPermissions PrivilegedGuildPermissions = new GuildPermissions(
+
+        // Will be needed for tests
+        internal static readonly GuildPermissions PrivilegedGuildPermissions = new GuildPermissions(
             speak: true,
             prioritySpeaker: true,
             sendMessages: true,
@@ -25,7 +30,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             deafenMembers: true,
             readMessageHistory: true,
             viewChannel: true);
-        private static readonly OverwritePermissions PrivilegedOverwritePermissions = new OverwritePermissions(
+        internal static readonly OverwritePermissions PrivilegedOverwritePermissions = new OverwritePermissions(
             speak: PermValue.Allow,
             sendMessages: PermValue.Allow,
             muteMembers: PermValue.Allow,
@@ -33,11 +38,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             readMessageHistory: PermValue.Allow,
             viewChannel: PermValue.Allow,
             moveMembers: PermValue.Allow);
-        private static readonly OverwritePermissions EveryonePermissions = new OverwritePermissions(
+        internal static readonly OverwritePermissions EveryonePermissions = new OverwritePermissions(
             viewChannel: PermValue.Deny,
             sendMessages: PermValue.Deny,
             readMessageHistory: PermValue.Deny);
-        private static readonly OverwritePermissions TeamPermissions = new OverwritePermissions(
+        internal static readonly OverwritePermissions TeamPermissions = new OverwritePermissions(
             viewChannel: PermValue.Allow,
             sendMessages: PermValue.Allow,
             readMessageHistory: PermValue.Allow);
@@ -225,7 +230,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         // TODO: Improve error message by explicitly searching for the missing team.
                         await this.SendUserMessage(
-                            string.Format(BotStrings.ErrorAtLeastOneTeamNotInTournament, string.Join(",", teamNames)));
+                            string.Format(BotStrings.ErrorAtLeastOneTeamNotInTournament, string.Join(", ", teamNames)));
                         return;
                     }
 
@@ -272,7 +277,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                     // TODO: Look into creating the channels after the update stage so we can release the lock
                     // sooner. However, this does mean that a failure to create channels will leave us in a bad 
-                    // stage.
+                    // state.
                     ICategoryChannel finalsCategoryChannel = await this.Context.Guild.CreateCategoryAsync($"Finals");
                     channel = await CreateTextChannel(
                         finalsCategoryChannel,
