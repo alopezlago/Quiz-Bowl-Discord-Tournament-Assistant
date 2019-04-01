@@ -106,6 +106,24 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to This command can only be used when a tournament is ready to start, which is after all the players have joined their teams..
+        /// </summary>
+        public static string CommandOnlyUsedTournamentReadyStart {
+            get {
+                return ResourceManager.GetString("CommandOnlyUsedTournamentReadyStart", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This command can only be used while the tournament is running. Use !back if you are still setting up the tournament..
+        /// </summary>
+        public static string CommandOnlyUsedWhileTournamentRunning {
+            get {
+                return ResourceManager.GetString("CommandOnlyUsedWhileTournamentRunning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Couldn&apos;t get the role for the old reader. Readers were not switched. You may need to manually switch the roles..
         /// </summary>
         public static string CouldntGetRoleForTheOldReader {
@@ -282,15 +300,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet {
         public static string TeamDoesNotExist {
             get {
                 return ResourceManager.GetString("TeamDoesNotExist", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to This command can only be used while the tournament is running. Use !back if you are still setting up the tournament..
-        /// </summary>
-        public static string ThisCommandCanOnlyBeUsedWhileTournamentRunning {
-            get {
-                return ResourceManager.GetString("ThisCommandCanOnlyBeUsedWhileTournamentRunning", resourceCulture);
             }
         }
         

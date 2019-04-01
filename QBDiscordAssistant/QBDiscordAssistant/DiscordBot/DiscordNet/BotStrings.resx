@@ -192,7 +192,7 @@
   <data name="TeamDoesNotExist" xml:space="preserve">
     <value>Team '{0}' does not exist.</value>
   </data>
-  <data name="ThisCommandCanOnlyBeUsedWhileTournamentRunning" xml:space="preserve">
+  <data name="CommandOnlyUsedWhileTournamentRunning" xml:space="preserve">
     <value>This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.</value>
   </data>
   <data name="TournamentCleanupFinished" xml:space="preserve">
@@ -218,5 +218,8 @@
   </data>
   <data name="UserNotTournamentDirector" xml:space="preserve">
     <value>User is not a director for tournament '{0}' in guild '{1}', or user was just removed.</value>
+  </data>
+  <data name="CommandOnlyUsedTournamentReadyStart" xml:space="preserve">
+    <value>This command can only be used when a tournament is ready to start, which is after all the players have joined their teams.</value>
   </data>
 </root>

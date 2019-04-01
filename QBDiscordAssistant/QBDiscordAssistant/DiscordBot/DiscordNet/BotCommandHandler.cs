@@ -413,6 +413,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (currentTournament?.Stage != TournamentStage.AddPlayers)
                     {
                         // !start only applies once we've started adding players
+                        await this.SendUserMessage(BotStrings.CommandOnlyUsedTournamentReadyStart);
                         return;
                     }
 
@@ -435,7 +436,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     }
                     catch (Exception)
                     {
-                        // TODO: Make the exceptions we catch more-defined.
+                        // TODO: Make the exceptions we catch more defined.
                         // Go back to the previous stage and undo any artifacts added.
                         await CleanupTournamentArtifacts(currentTournament);
                         await UpdateStage(currentTournament, TournamentStage.AddPlayers);
@@ -445,7 +446,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (startSucceeded)
             {
-
                 await this.Context.Channel.SendMessageAsync(string.Format(
                     BotStrings.TournamentHasStarted, MentionUtils.MentionChannel(this.Context.Channel.Id)));
             }
@@ -463,7 +463,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         currentTournament.Stage != TournamentStage.Finals)
                     {
 
-                        await this.SendUserMessage(BotStrings.ThisCommandCanOnlyBeUsedWhileTournamentRunning);
+                        await this.SendUserMessage(BotStrings.CommandOnlyUsedWhileTournamentRunning);
                         return;
                     }
 
@@ -544,7 +544,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private static string GetVoiceRoomName(Reader reader)
         {
-            return $"{reader.Name}'s_Voice_Channel";
+            return $"{reader.Name.Replace(" ", "_")}'s_Voice_Channel";
         }
 
         private async Task<Dictionary<Team, IRole>> AssignPlayerRoles(

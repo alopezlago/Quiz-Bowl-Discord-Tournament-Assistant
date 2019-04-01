@@ -43,8 +43,8 @@ Starting a tournament:
   10. To end the tournament, use !end
     !end
 
-
-TODO: Add unit testing
+TODO: Add unit testing for message handling.
+TODO: Remove resx dependency. Using it as a template for a class of strongly-typed strings.
 TODO: Add bracketed schedules.
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Look into adding more logging.
