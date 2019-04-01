@@ -18,7 +18,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             IDMChannel channel = await user.GetOrCreateDMChannelAsync();
-            await channel.SendMessageAsync(string.Format(BotStrings.UnableToPerformCommand, result.ErrorMessage));
+            await channel.SendMessageAsync(BotStrings.UnableToPerformCommand(result.ErrorMessage));
         }
 
         public static async Task DoReadWriteActionOnCurrentTournamentForMember(
@@ -32,7 +32,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             IDMChannel channel = await user.GetOrCreateDMChannelAsync();
-            await channel.SendMessageAsync(string.Format(BotStrings.UnableToPerformCommand, result.ErrorMessage));
+            await channel.SendMessageAsync(BotStrings.UnableToPerformCommand(result.ErrorMessage));
         }
     }
 }

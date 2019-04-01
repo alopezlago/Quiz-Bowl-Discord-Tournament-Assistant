@@ -17,12 +17,12 @@ namespace QBDiscordAssistant.Tournament
             if (roundRobins <= 0)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(roundRobins), string.Format(TournamentStrings.RoundRobinsMustBePositive, roundRobins));
+                    nameof(roundRobins), TournamentStrings.RoundRobinsMustBePositive(roundRobins));
             }
             else if (teams.Count <= 1)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(teams), string.Format(TournamentStrings.MustHaveMoreThanOneTeam, teams.Count));
+                    nameof(teams), TournamentStrings.MustHaveMoreThanOneTeam(teams.Count));
             }
             else if (readers.Count == 0)
             {

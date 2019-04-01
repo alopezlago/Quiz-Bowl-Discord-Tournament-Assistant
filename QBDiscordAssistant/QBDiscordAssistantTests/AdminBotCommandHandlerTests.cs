@@ -25,8 +25,8 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.AddTournamentDirectorSuccessful, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
+                DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -50,8 +50,8 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(secondUserId);
             await commandHandler.AddTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.AddTournamentDirectorSuccessful, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
+                DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -74,8 +74,7 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.UserAlreadyTournamentDirector, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.UserAlreadyTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -97,8 +96,7 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(DefaultUserId);
             await commandHandler.RemoveTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.RemovedTournamentDirector, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.RemovedTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -120,8 +118,7 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.UserNotTournamentDirector, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.UserNotTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -141,8 +138,7 @@ namespace QBDiscordAssistantTests
 
             IGuildUser guildUser = CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirector(guildUser, DefaultTournamentName);
-            string expectedMessage = string.Format(
-                BotStrings.TournamentDoesNotExist, DefaultTournamentName, DefaultGuildName);
+            string expectedMessage = BotStrings.TournamentDoesNotExist(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
         }
 

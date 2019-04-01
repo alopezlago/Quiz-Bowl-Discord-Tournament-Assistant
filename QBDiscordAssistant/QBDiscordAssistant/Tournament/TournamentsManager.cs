@@ -114,14 +114,13 @@ namespace QBDiscordAssistant.Tournament
             {
                 if (this.CurrentTournament != null)
                 {
-                    errorMessage = string.Format(
-                        TournamentStrings.TournamentAlreadyRunning, this.CurrentTournament.Name);
+                    errorMessage = TournamentStrings.TournamentAlreadyRunning(this.CurrentTournament.Name);
                     return false;
                 }
 
                 if (!this.pendingTournaments.TryGetValue(name, out ITournamentState state))
                 {
-                    errorMessage = string.Format(TournamentStrings.TournamentCannotBeFound, name);
+                    errorMessage = TournamentStrings.TournamentCannotBeFound(name);
                     return false;
                 }
 
@@ -130,8 +129,7 @@ namespace QBDiscordAssistant.Tournament
                 if (!this.pendingTournaments.TryRemove(name, out state))
                 {
                     // Couldn't set the current tournament, so roll back the change
-                    errorMessage = string.Format(
-                        TournamentStrings.CannotMoveTournamentFromPending, this.CurrentTournament.Name);
+                    errorMessage = TournamentStrings.CannotMoveTournamentFromPending(this.CurrentTournament.Name);
                     this.CurrentTournament = null;
                     return false;
                 }

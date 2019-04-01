@@ -71,18 +71,16 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         };
                         if (currentTournament.TryAddPlayer(player))
                         {
-                            return this.SendUserMessage(
-                                string.Format(BotStrings.AddPlayerSuccessful, user.Mention, teamName));
+                            return this.SendUserMessage(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
                         }
                         else
                         {
-                            return this.SendUserMessage(
-                                string.Format(BotStrings.PlayerIsAlreadyOnTeam, user.Mention));
+                            return this.SendUserMessage(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
                         }
                     }
 
 
-                    return this.SendUserMessage(string.Format(BotStrings.TeamDoesNotExist, teamName));
+                    return this.SendUserMessage(BotStrings.TeamDoesNotExist(teamName));
                 });
         }
 
@@ -112,11 +110,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (updateSuccessful)
             {
                 return this.SendUserMessage(
-                    string.Format(BotStrings.AddTournamentDirectorSuccessful, tournamentName, this.Context.Guild.Name));
+                    BotStrings.AddTournamentDirectorSuccessful(tournamentName, this.Context.Guild.Name));
             }
 
             return this.SendUserMessage(
-                string.Format(BotStrings.UserAlreadyTournamentDirector, tournamentName, this.Context.Guild.Name));
+                BotStrings.UserAlreadyTournamentDirector(tournamentName, this.Context.Guild.Name));
         }
 
         public Task Back()
@@ -150,8 +148,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             break;
                         default:
                             // Nothing to go back to, so do nothing.
-                            await this.SendUserMessage(
-                                string.Format(BotStrings.CannotGoBack, currentTournament.Stage));
+                            await this.SendUserMessage(BotStrings.CannotGoBack(currentTournament.Stage));
                             return;
                     }
 
@@ -163,8 +160,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public async Task ClearAll()
         {
             await CleanupAllPossibleTournamentArtifacts();
-            await this.SendUserMessage(
-                string.Format(BotStrings.AllPossibleTournamentArtifactsCleaned, this.Context.Guild.Name));
+            await this.SendUserMessage(BotStrings.AllPossibleTournamentArtifactsCleaned(this.Context.Guild.Name));
         }
 
         public async Task End()
@@ -179,7 +175,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            await this.SendUserMessage(string.Format(BotStrings.TournamentCleanupFinished, this.Context.Guild.Name));
+            await this.SendUserMessage(BotStrings.TournamentCleanupFinished(this.Context.Guild.Name));
         }
 
         public async Task Finals(IGuildUser readerUser, string rawTeamNameParts)
@@ -210,14 +206,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!TeamNameParser.TryGetTeamNamesFromParts(
                         combinedTeamNames, out HashSet<string> teamNames, out string errorMessage))
                     {
-                        await this.SendUserMessage(string.Format(BotStrings.ErrorGenericMessage, errorMessage));
+                        await this.SendUserMessage(BotStrings.ErrorGenericMessage(errorMessage));
                         return;
                     }
 
                     if (teamNames.Count != 2)
                     {
-                        await this.SendUserMessage(
-                            string.Format(BotStrings.ErrorTwoTeamsMustBeSpecifiedFinals, teamNames.Count));
+                        await this.SendUserMessage(BotStrings.ErrorTwoTeamsMustBeSpecifiedFinals(teamNames.Count));
                         return;
                     }
 
@@ -230,7 +225,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         // TODO: Improve error message by explicitly searching for the missing team.
                         await this.SendUserMessage(
-                            string.Format(BotStrings.ErrorAtLeastOneTeamNotInTournament, string.Join(", ", teamNames)));
+                            BotStrings.ErrorAtLeastOneTeamNotInTournament(string.Join(", ", teamNames)));
                         return;
                     }
 
@@ -291,8 +286,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (channel != null)
             {
-                await this.Context.Channel.SendMessageAsync(
-                    string.Format(BotStrings.FinalsParticipantsPleaseJoin, channel.Mention));
+                await this.Context.Channel.SendMessageAsync(BotStrings.FinalsParticipantsPleaseJoin(channel.Mention));
             }
         }
 
@@ -302,7 +296,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             // error message to the user instead.
             return DoReadActionOnCurrentTournament(
                 currentTournament => this.SendUserMessage(
-                    string.Format(BotStrings.CurrentTournamentInGuild, this.Context.Guild.Name, currentTournament.Name)));
+                    BotStrings.CurrentTournamentInGuild(this.Context.Guild.Name, currentTournament.Name)));
         }
 
         public async Task GetPlayers()
@@ -345,10 +339,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     if (currentTournament.TryRemovePlayer(user.Id))
                     {
-                        return this.SendUserMessage(string.Format(BotStrings.PlayerRemoved, user.Mention));
+                        return this.SendUserMessage(BotStrings.PlayerRemoved(user.Mention));
                     }
 
-                    return this.SendUserMessage(string.Format(BotStrings.PlayerIsNotOnAnyTeam, user.Mention));
+                    return this.SendUserMessage(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
                 });
         }
 
@@ -368,19 +362,19 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
             {
                 await dmChannel.SendMessageAsync(
-                    string.Format(BotStrings.TournamentDoesNotExist, tournamentName, this.Context.Guild.Name));
+                    BotStrings.TournamentDoesNotExist(tournamentName, this.Context.Guild.Name));
                 return;
             }
 
             if (state.TryRemoveDirector(oldDirector.Id))
             {
                 await dmChannel.SendMessageAsync(
-                    string.Format(BotStrings.RemovedTournamentDirector, tournamentName, this.Context.Guild.Name));
+                    BotStrings.RemovedTournamentDirector(tournamentName, this.Context.Guild.Name));
                 return;
             }
 
             await dmChannel.SendMessageAsync(
-                string.Format(BotStrings.UserNotTournamentDirector, tournamentName, this.Context.Guild.Name));
+                BotStrings.UserNotTournamentDirector(tournamentName, this.Context.Guild.Name));
         }
 
         public Task Setup(string tournamentName)
@@ -395,9 +389,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             TournamentsManager manager = this.GlobalManager.GetOrAdd(this.Context.Guild.Id, CreateTournamentsManager);
 
             if (!manager.TrySetCurrentTournament(tournamentName, out string errorMessage))
-            {                
+            {
                 return this.SendUserMessage(
-                    string.Format(BotStrings.ErrorSettingCurrentTournament, this.Context.Guild.Name, errorMessage));
+                    BotStrings.ErrorSettingCurrentTournament(this.Context.Guild.Name, errorMessage));
             }
 
             return this.DoReadWriteActionOnCurrentTournament(
@@ -446,8 +440,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (startSucceeded)
             {
-                await this.Context.Channel.SendMessageAsync(string.Format(
-                    BotStrings.TournamentHasStarted, MentionUtils.MentionChannel(this.Context.Channel.Id)));
+                await this.Context.Channel.SendMessageAsync(BotStrings.TournamentHasStarted(
+                    MentionUtils.MentionChannel(this.Context.Channel.Id)));
             }
         }
 
@@ -480,13 +474,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                     if (!currentTournament.IsReader(oldReaderUser.Id))
                     {
-                        await this.SendUserMessage(string.Format(BotStrings.NotACurrentReader, oldReaderUser.Mention));
+                        await this.SendUserMessage(BotStrings.NotACurrentReader(oldReaderUser.Mention));
                         return;
                     }
                     else if (currentTournament.IsReader(newReaderUser.Id))
                     {
-                        
-                        await this.SendUserMessage(string.Format(BotStrings.IsAlreadyReader, newReaderUser.Mention));
+
+                        await this.SendUserMessage(BotStrings.IsAlreadyReader(newReaderUser.Mention));
                         return;
                     }
 
@@ -774,7 +768,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     channelProps.CategoryId = parent.Id;
                 });
-            
+
             await channel.AddPermissionOverwriteAsync(this.Context.Guild.EveryoneRole, EveryonePermissions);
 
             // TODO: Give the bot less-than-privileged permissions.

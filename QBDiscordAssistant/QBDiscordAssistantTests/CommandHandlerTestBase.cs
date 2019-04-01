@@ -42,7 +42,6 @@ namespace QBDiscordAssistantTests
             return this.CreateMockCommandContext(messageStore, guildId, guildName, roleNames).Object;
         }
 
-        // TODO: We need to create mocks for all of CommandContext's properties so tests can override them.
         protected Mock<IDiscordClient> CreateMockClient()
         {
             Mock<ISelfUser> mockSelfUser = new Mock<ISelfUser>();
@@ -138,7 +137,6 @@ namespace QBDiscordAssistantTests
                             It.IsAny<IUser>(), It.IsAny<OverwritePermissions>(), null))
                         .Returns<IUser, OverwritePermissions, RequestOptions>((user, permissions, options2) =>
                         {
-                            // TODO: Look into adding a value to separate users from roles.
                             textChannelPermissions[user.Id] = permissions;
                             return Task.CompletedTask;
                         });

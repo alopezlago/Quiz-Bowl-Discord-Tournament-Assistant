@@ -201,12 +201,11 @@ namespace QBDiscordAssistant.Tournament
                     break;
                 case TournamentStage.SetRoundRobins:
                     nextStageTitle = TournamentStrings.SetNumberRoundRobins;
-                    nextStageInstructions = string.Format(TournamentStrings.SpecifyNumberRoundRobins, MaxRoundRobins);
+                    nextStageInstructions = TournamentStrings.SpecifyNumberRoundRobins(MaxRoundRobins);
                     break;
                 case TournamentStage.AddTeams:
                     nextStageTitle = TournamentStrings.AddTeams;
-                    nextStageInstructions =
-                        string.Format(TournamentStrings.AddListCommaSeparatedTeams, this.GetMaximumTeamCount());
+                    nextStageInstructions = TournamentStrings.AddListCommaSeparatedTeams(this.GetMaximumTeamCount());
                     break;
                 case TournamentStage.BotSetup:
                     nextStageTitle = TournamentStrings.SettingUpTournament;
@@ -214,12 +213,11 @@ namespace QBDiscordAssistant.Tournament
                     break;
                 case TournamentStage.RunningPrelims:
                     nextStageTitle = TournamentStrings.TournamentStarted;
-                    nextStageInstructions = string.Format(TournamentStrings.TournamentStartedDirections, this.Name);
+                    nextStageInstructions = TournamentStrings.TournamentStartedDirections(this.Name);
                     break;
                 case TournamentStage.Complete:
                     nextStageTitle = TournamentStrings.TournamentCompleted;
-                    nextStageInstructions = string.Format(
-                        TournamentStrings.AllTournamentChannelsRolesRemoved, this.Name);
+                    nextStageInstructions = TournamentStrings.AllTournamentChannelsRolesRemoved(this.Name);
                     break;
                 default:
                     nextStageTitle = null;

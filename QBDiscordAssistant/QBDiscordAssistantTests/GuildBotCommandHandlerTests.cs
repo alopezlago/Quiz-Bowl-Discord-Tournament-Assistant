@@ -22,9 +22,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
             await commandHandler.GetCurrentTournament();
-            // TODO: Move to resx file
-            string expectedMessage = string.Format(
-                BotStrings.UnableToPerformCommand, "No current tournament is running.");
+            string expectedMessage = BotStrings.UnableToPerformCommand(TournamentStrings.NoCurrentTournamentRunning);
             messageStore.VerifyDirectMessages(expectedMessage);
         }
 
@@ -38,8 +36,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
             await commandHandler.GetCurrentTournament();
-            string expectedMessage = string.Format(
-                BotStrings.CurrentTournamentInGuild, DefaultGuildName, DefaultTournamentName);
+            string expectedMessage = BotStrings.CurrentTournamentInGuild(DefaultGuildName, DefaultTournamentName);
             messageStore.VerifyDirectMessages(expectedMessage);
         }
     }
