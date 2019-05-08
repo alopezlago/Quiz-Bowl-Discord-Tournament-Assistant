@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace QBDiscordAssistant.Tournament
 {
     public class RoundRobinScheduleFactory : IScheduleFactory
     {
+        internal const int MaximumBrackets = 6;
+
         private readonly int roundRobins;
 
         public RoundRobinScheduleFactory(int roundRobins)
@@ -12,17 +15,31 @@ namespace QBDiscordAssistant.Tournament
             this.roundRobins = roundRobins;
         }
 
-        public Schedule Generate(ISet<Team> teams, ISet<Reader> readers)
+        public Schedule Generate(IEnumerable<ISet<Team>> teams, ISet<Reader> readers)
         {
             if (roundRobins <= 0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(roundRobins), TournamentStrings.RoundRobinsMustBePositive(roundRobins));
             }
-            else if (teams.Count <= 1)
+
+            int bracketsCount = teams.Count();
+            if (bracketsCount > MaximumBrackets)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(teams), TournamentStrings.MustHaveMoreThanOneTeam(teams.Count));
+                    nameof(teams), TournamentStrings.OnlyAtMostNBrackets(bracketsCount));
+            }
+
+            int teamsCount = teams.Sum(t => t.Count);
+            if (teamsCount <= 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(teams), TournamentStrings.MustHaveMoreThanOneTeam(teamsCount));
+            }
+            else if (teams.Any(t => t.Count <= 1))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(teams), TournamentStrings.MustHaveMoreThanOneTeamPerBracket);
             }
             else if (readers.Count == 0)
             {
@@ -30,74 +47,36 @@ namespace QBDiscordAssistant.Tournament
             }
 
             Schedule schedule = new Schedule();
-            bool hasBye = teams.Count % 2 == 1;
-            int rounds = checked(this.roundRobins * (hasBye ? teams.Count : teams.Count - 1));
+            List<Bracket> brackets = this.CreateBrackets(teams, readers);
+            int maximumRounds = brackets.Max(bracket => bracket.Rounds);
+            Round[] rounds = Enumerable.Range(0, maximumRounds)
+                .Select(number => new Round())
+                .ToArray();
 
-            // Generates a schedule using the Circle method. Initialize the two rows with the teams based on the order
-            // they were created.
-            int rowLength = (teams.Count + 1) / 2;
-            Team[] topRow = new Team[rowLength];
-            Team[] bottomRow = new Team[rowLength];
-            using (IEnumerator<Team> enumerator = teams.GetEnumerator())
+            // TODO: Investigate if it makes sense to parallelize this
+            foreach (Bracket bracket in brackets)
             {
-                for (int i = 0; i < topRow.Length; i++)
+                for (int i = 0; i < bracket.Rounds; i++)
                 {
-                    enumerator.MoveNext();
-                    topRow[i] = enumerator.Current;
-                }
-
-                for (int i = 0; i < bottomRow.Length; i++)
-                {
-                    enumerator.MoveNext();
-                    bottomRow[i] = enumerator.Current;
+                    this.AddBracketGamesToRound(rounds[i], bracket, i);
                 }
             }
 
-            for (int i = 0; i < rounds; i++)
+            foreach (Round round in rounds)
             {
-                Round round = GenerateRound(i, topRow, bottomRow, readers, hasBye);
                 schedule.AddRound(round);
             }
 
             return schedule;
         }
 
-        private Round GenerateRound(int roundNumber, Team[] topRow, Team[] bottomRow, ISet<Reader> readers, bool hasBye)
+        public Schedule Generate(ISet<Team> teams, ISet<Reader> readers)
         {
-            int gamesCount = hasBye ? topRow.Length - 1 : topRow.Length;
-            Round round = new Round();
-            using (IEnumerator<Reader> readersEnumerator = readers.GetEnumerator())
-            {
-                // If there's no bye team, then topRow.Length is the same as gamesCount. Otherwise, we'll skip at least
-                // one potential game if we go through the whole top row, so the count will still match.
-                for (int i = 0; i < topRow.Length; i++)
-                {
-                    Team firstTeam = topRow[i];
-                    if (firstTeam == null)
-                    {
-                        // Skip the bye team
-                        continue;
-                    }
-
-                    Team secondTeam = bottomRow[i];
-                    if (secondTeam == null)
-                    {
-                        // Skip the bye team
-                        continue;
-                    }
-
-                    readersEnumerator.MoveNext();
-                    Reader reader = readersEnumerator.Current;
-                    round.Games.Add(new Game()
-                    {
-                        Teams = new Team[] { firstTeam, secondTeam },
-                        Reader = reader
-                    });
-                }
-            }
-
-            RotateCells(topRow, bottomRow);
-            return round;
+            ISet<Team>[] teamsByBracket = teams
+                .GroupBy(team => team.Bracket)
+                .Select(grouping => new HashSet<Team>(grouping))
+                .ToArray();
+            return this.Generate(teamsByBracket, readers);
         }
 
         private static void RotateCells(Team[] topRow, Team[] bottomRow)
@@ -136,6 +115,125 @@ namespace QBDiscordAssistant.Tournament
             }
 
             bottomRow[bottomRow.Length - 1] = leavingTopRowTeam;
+        }
+
+        private void AddBracketGamesToRound(Round round, Bracket bracket, int roundNumber)
+        {
+            using (IEnumerator<Reader> readers = bracket.Readers.GetEnumerator())
+            {
+                GenerateGameForRound(round, readers, roundNumber, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
+            }
+        }
+
+        private List<Bracket> CreateBrackets(IEnumerable<ISet<Team>> teams, ISet<Reader> readers)
+        {
+            int teamsCount = teams.Count();
+            if (teamsCount / 2 > readers.Count)
+            {
+                throw new ArgumentException(TournamentStrings.NotEnoughReadersForTeams(readers.Count, teamsCount));
+            }
+
+            List<Bracket> brackets = new List<Bracket>();
+            using (IEnumerator<Reader> readersEnumerator = readers.GetEnumerator())
+            {
+                foreach (ISet<Team> teamsInBracket in teams)
+                {
+                    // We're adding a reader for every 2 teams, so start at 1 and increment by 2.
+                    List<Reader> bracketReaders = new List<Reader>();
+                    for (int i = 1; i < teamsInBracket.Count; i += 2)
+                    {
+                        readersEnumerator.MoveNext();
+                        bracketReaders.Add(readersEnumerator.Current);
+                    }
+
+                    bool hasBye = teamsInBracket.Count % 2 == 1;
+                    int rounds = checked(this.roundRobins * (hasBye ? teamsInBracket.Count : teamsInBracket.Count - 1));
+
+                    this.GetInitialRows(teamsInBracket, out Team[] topRow, out Team[] bottomRow);
+
+                    brackets.Add(new Bracket()
+                    {
+                        Readers = bracketReaders,
+                        Teams = teamsInBracket,
+                        TopRow = topRow,
+                        BottomRow = bottomRow,
+                        Rounds = rounds,
+                        HasBye = hasBye
+                    });
+                }
+            }
+
+            return brackets;
+        }
+
+        private void GenerateGameForRound(
+            Round round, IEnumerator<Reader> readers, int roundNumber, Team[] topRow, Team[] bottomRow, bool hasBye)
+        {
+            int gamesCount = hasBye ? topRow.Length - 1 : topRow.Length;
+            for (int i = 0; i < topRow.Length; i++)
+            {
+                Team firstTeam = topRow[i];
+                if (firstTeam == null)
+                {
+                    // Skip the bye team
+                    continue;
+                }
+
+                Team secondTeam = bottomRow[i];
+                if (secondTeam == null)
+                {
+                    // Skip the bye team
+                    continue;
+                }
+
+                readers.MoveNext();
+                Reader reader = readers.Current;
+                round.Games.Add(new Game()
+                {
+                    Teams = new Team[] { firstTeam, secondTeam },
+                    Reader = reader
+                });
+            }
+
+            RotateCells(topRow, bottomRow);
+        }
+
+        private void GetInitialRows(ISet<Team> teams, out Team[] topRow, out Team[] bottomRow)
+        {
+            // Generates a schedule using the Circle method. Initialize the two rows with the teams based on the order
+            // they were created.
+            int rowLength = (teams.Count + 1) / 2;
+            topRow = new Team[rowLength];
+            bottomRow = new Team[rowLength];
+            using (IEnumerator<Team> enumerator = teams.GetEnumerator())
+            {
+                for (int i = 0; i < topRow.Length; i++)
+                {
+                    enumerator.MoveNext();
+                    topRow[i] = enumerator.Current;
+                }
+
+                for (int i = 0; i < bottomRow.Length; i++)
+                {
+                    enumerator.MoveNext();
+                    bottomRow[i] = enumerator.Current;
+                }
+            }
+        }
+
+        private class Bracket
+        {
+            public IEnumerable<Reader> Readers { get; set; }
+
+            public ISet<Team> Teams { get; set; }
+
+            public Team[] TopRow { get; set; }
+
+            public Team[] BottomRow { get; set; }
+
+            public int Rounds { get; set; }
+
+            public bool HasBye { get; set; }
         }
     }
 }

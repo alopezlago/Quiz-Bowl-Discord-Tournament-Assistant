@@ -284,7 +284,7 @@ namespace QBDiscordAssistant.DiscordBot.DSharpPlus
         private async Task HandleAddTeamsStage(ITournamentState currentTournament, MessageCreateEventArgs args)
         {
             if (!TeamNameParser.TryGetTeamNamesFromParts(
-                args.Message.Content, out HashSet<string> teamNames, out string errorMessage))
+                args.Message.Content, out IList<string> teamNames, out string errorMessage))
             {
                 await args.Channel.SendMessageAsync(errorMessage);
                 return;

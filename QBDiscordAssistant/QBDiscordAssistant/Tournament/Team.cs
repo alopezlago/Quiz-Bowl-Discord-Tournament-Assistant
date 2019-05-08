@@ -7,6 +7,8 @@ namespace QBDiscordAssistant.Tournament
     {
         public string Name { get; set; }
 
+        public int Bracket { get; set; }
+
         public override bool Equals(object obj)
         {
             if (obj is Team otherTeam)

@@ -378,25 +378,35 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         // TODO: Make string message and IGuildChannel?
         private async Task HandleAddTeamsStage(ITournamentState currentTournament, SocketMessage message)
         {
-            if (!TeamNameParser.TryGetTeamNamesFromParts(
-                message.Content, out HashSet<string> teamNames, out string errorMessage))
+            // We don't use Environment.NewLine because we only need a plain newline, even in Windows (shift+Enter)
+            string[] teamsList = message.Content.Split("\n");
+            List<Team> teams = new List<Team>();
+            string errorMessage;
+            for (int i  = 0; i < teamsList.Length; i++)
             {
-                await message.Channel.SendMessageAsync(errorMessage);
-                return;
+                string teamList = teamsList[i];
+                if (!TeamNameParser.TryGetTeamNamesFromParts(
+                    teamList, out IList<string> newTeamNames, out errorMessage))
+                {
+                    await message.Channel.SendMessageAsync(errorMessage);
+                    return;
+                }
+
+                teams.AddRange(newTeamNames.Select(teamName =>
+                    new Team()
+                    {
+                        Name = teamName,
+                        Bracket = i
+                    }));
             }
 
-            IEnumerable<Team> newTeams = teamNames
-                .Select(name => new Team()
-                {
-                    Name = name
-                });
-            currentTournament.AddTeams(newTeams);
+            currentTournament.AddTeams(teams);
 
             int teamsCount = currentTournament.Teams.Count();
             if (teamsCount < 2)
             {
                 await message.Channel.SendMessageAsync("There must be at least two teams for a tournament. Specify more teams.");
-                currentTournament.RemoveTeams(newTeams);
+                currentTournament.RemoveTeams(teams);
                 return;
             }
 

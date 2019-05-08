@@ -477,7 +477,7 @@ namespace QBDiscordAssistant.DiscordBot.DSharpPlus
 
                     string combinedTeamNames = string.Join(" ", rawTeamNameParts).Trim();
                     if (!TeamNameParser.TryGetTeamNamesFromParts(
-                        combinedTeamNames, out HashSet<string> teamNames, out string errorMessage))
+                        combinedTeamNames, out IList<string> teamNames, out string errorMessage))
                     {
                         await context.Member.SendMessageAsync($"Error: {errorMessage}");
                         return;

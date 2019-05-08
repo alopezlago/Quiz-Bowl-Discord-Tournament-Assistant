@@ -204,7 +204,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                     string combinedTeamNames = string.Join(" ", rawTeamNameParts).Trim();
                     if (!TeamNameParser.TryGetTeamNamesFromParts(
-                        combinedTeamNames, out HashSet<string> teamNames, out string errorMessage))
+                        combinedTeamNames, out IList<string> teamNames, out string errorMessage))
                     {
                         await this.SendUserMessage(BotStrings.ErrorGenericMessage(errorMessage));
                         return;
@@ -418,6 +418,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         // TODO: Add more messaging around the current status
                         IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
                             currentTournament.RoundRobinsCount);
+
                         currentTournament.Schedule = scheduleFactory.Generate(
                             new HashSet<Team>(currentTournament.Teams),
                             new HashSet<Reader>(currentTournament.Readers));

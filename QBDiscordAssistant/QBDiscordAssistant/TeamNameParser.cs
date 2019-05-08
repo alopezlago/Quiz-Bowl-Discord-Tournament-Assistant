@@ -10,10 +10,11 @@ namespace QBDiscordAssistant
         // Input: a list of comma-delimited team names
         // Output: a set of team names if we could parse it, or an error message if we couldn't.
         public static bool TryGetTeamNamesFromParts(
-            string combinedTeamNames, out HashSet<string> teamNames, out string errorMessage)
+            string combinedTeamNames, out IList<string> teamNames, out string errorMessage)
         {
             errorMessage = null;
-            teamNames = new HashSet<string>();
+            teamNames = new List<string>();
+            HashSet<string> previousTeamNames = new HashSet<string>();
 
             if (string.IsNullOrEmpty(combinedTeamNames))
             {
@@ -43,7 +44,11 @@ namespace QBDiscordAssistant
                         .Substring(startIndex, length)
                         .Trim()
                         .Replace(",,", ",");
-                    teamNames.Add(teamName);
+                    if (previousTeamNames.Add(teamName))
+                    {
+                        teamNames.Add(teamName);
+                    }
+                    
                     startIndex = i;
                     possibleCommaEscapeStart = false;
                 }
@@ -62,7 +67,10 @@ namespace QBDiscordAssistant
                 .Substring(startIndex, length)
                 .Trim()
                 .Replace(",,", ",");
-            teamNames.Add(teamName);
+            if (!previousTeamNames.Contains(teamName))
+            {
+                teamNames.Add(teamName);
+            }
 
             return true;
         }

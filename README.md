@@ -44,7 +44,7 @@ Starting a tournament:
     !end
 
 TODO: Add unit testing for message handling.
-TODO: Add bracketed schedules.
+TODO: Fix bug with confusing message when a TD can't join a team.
 TODO: Remove DSharpPlus implementation
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Look into adding more logging.
