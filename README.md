@@ -45,7 +45,6 @@ Starting a tournament:
 
 TODO: Add unit testing for message handling.
 TODO: Fix bug with confusing message when a TD can't join a team.
-TODO: Remove DSharpPlus implementation
 TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
 TODO: Look into adding more logging.
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
