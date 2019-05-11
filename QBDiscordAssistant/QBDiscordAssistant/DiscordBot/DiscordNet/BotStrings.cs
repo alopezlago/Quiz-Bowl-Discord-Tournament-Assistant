@@ -5,15 +5,23 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
     public static class BotStrings
     {
         public const string AllReaderNamesShouldBeUnique = "All reader names should be unique.";
+        public const string BotCannotJoinAsPlayer = "Bot cannot join as a player.";
+        public const string ClickOnReactionsJoinTeam = "Click on the reactions corresponding to your team to join it. Click on the reaction again to leave that team.";
         public const string CommandOnlyUsedTournamentReadyStart = "This command can only be used when a tournament is ready to start, which is after all the players have joined their teams.";
         public const string CommandOnlyUsedWhileTournamentRunning = "This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.";
-        public static string CouldntGetRoleForTheOldReader = "Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.";
+        public const string CouldntGetRoleForTheOldReader = "Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.";
         public const string CreatingChannelsAndRoles = "Creating the channels and roles...";
         public const string ErrorFinalsOnlySetDuringPrelims = "Error: finals can only be set during the prelims.";
         public const string ErrorGivenUserIsntAReader = "Error: given user isn't a reader.";
         public const string ErrorNoTeamsSpecified = "Error: No teams specified.";
+        public const string JoinTeams = "Join Teams";
+        public const string MustBeTwoTeamsPerTournament = "There must be at least two teams for a tournament. Specify more teams.";
+        public const string NoReadersAddedMinimumReaderCount = "No readers added. There must be at least one reader for a tournament.";
         public const string NoTeamsYet = " No teams have been created yet.";
+        public const string NumberOfTeamsMustBeGreaterThanZero = "Number of teams must be greater than 0.";
+        public const string ReaderCannotJoinAsPlayer = "A reader cannot join as a player.";
         public const string ReadersSwitchedSuccessfully = "Readers switched successfully.";
+        public const string TournamentDirectorCannotJoinAsPlayer = "A tournament director cannot join as a player.";
         public const string TournamentWasNotRemoved = "Tournament was not removed from the list of pending tournaments. Try the command again.";
         public const string UnknownErrorRemovingOldReader = "Unknown error when trying to remove the old reader.";
 
@@ -67,6 +75,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"Finals participants: please join the room {room} and join the voice channel for that room number.";
         }
 
+        public static string InvalidNumberOfRoundRobins(int maxRoundRobins)
+        {
+            return $"Invalid number of round robins. The number must be between 1 and {maxRoundRobins}";
+        }
+
         public static string IsAlreadyReader(string name)
         {
             return $"{name} is already a reader. The new reader must not be an existing reader.";
@@ -92,6 +105,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"Player {name} removed.";
         }
 
+        public static string ReadersTotalForTournament(int readersCount)
+        {
+            return $"{readersCount} readers total for the tournament.";
+        }
+
         public static string RemovedTournamentDirector(string tournamentName, string guildName)
         {
             return $"Removed tournament director from tournament '{tournamentName}' in guild '{guildName}'.";
@@ -100,6 +118,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public static string TeamDoesNotExist(string teamName)
         {
             return $"Team '{teamName}' does not exist.";
+        }
+
+        public static string TooManyTeams(int maximumTeamCount)
+        {
+            return $"Too many teams. Maximum number of teams: {maximumTeamCount}";
         }
 
         public static string TournamentCleanupFinished(string guildName)
@@ -122,6 +145,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"Unable to perform command. {message}";
         }
 
+        public static string UnexpectedErrorAddingTeams(string message)
+        {
+            return $"Unexpected failure adding teams: '{message}'. None of the teams have been added.";
+        }
+
         public static string UserAlreadyTournamentDirector(string tournamentName, string guildName)
         {
             return $"User is already a director of '{tournamentName}' in guild '{guildName}'.";
@@ -130,6 +158,16 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public static string UserNotTournamentDirector(string tournamentName, string guildName)
         {
             return $"User is not a director for tournament '{tournamentName}' in guild '{guildName}', or user was just removed.";
+        }
+
+        public static string YouHaveJoinedTeam(string teamName)
+        {
+            return $"You have joined the team '{teamName}'";
+        }
+
+        public static string YouHaveLeftTeam(string teamName)
+        {
+            return $"You have left the team '{teamName}'";
         }
     }
 }

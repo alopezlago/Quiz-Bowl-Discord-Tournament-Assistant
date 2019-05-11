@@ -140,12 +140,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             IUserMessage message = cachedMessage.Value;
             Player player = null;
             bool playerAdded = false;
+            string errorMessage = null;
             bool attempt = this
                 .GetTournamentsManager(guildChannel.Guild)
                 .TryReadWriteActionOnCurrentTournament(currentTournament =>
                 {
                     player = GetPlayerFromReactionEventOrNull(
-                        currentTournament, guildUser, message.Id, reaction.Emote.Name);
+                        currentTournament, guildUser, message.Id, reaction.Emote.Name, out errorMessage);
                     if (player == null)
                     {
                         // TODO: we may want to remove the reaction if it's on our team-join messages.
@@ -157,23 +158,20 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     playerAdded = currentTournament.TryAddPlayer(player);
                 });
 
-            if (!(attempt && playerAdded))
+            if (!(attempt && playerAdded) && errorMessage != null)
             {
                 // TODO: We should remove the reaction they gave instead of this one (this may also require the manage
                 // emojis permission?). This would also require a map from userIds/Players to emojis in the tournament
                 // state. The Reactions collection doesn't have information on who added it, and iterating through each
                 // emoji to see if the user was there would be slow.
                 Task deleteReactionTask = message.RemoveReactionAsync(reaction.Emote, guildUser);
-                string errorMessage = attempt ?
-                    "You are already on a team. Click on the emoji of the team you were on to leave that team, then click on the emoji of the team you want to join." :
-                    "We were unable to add you to the team. Try again.";
                 Task sendMessageTask = guildUser.SendMessageAsync(errorMessage);
                 await Task.WhenAll(deleteReactionTask, sendMessageTask);
                 return;
             }
             else if (player != null)
             {
-                await guildUser.SendMessageAsync($"You have joined the team {player.Team.Name}");
+                await guildUser.SendMessageAsync(BotStrings.YouHaveJoinedTeam(player.Team.Name));
             }
         }
 
@@ -209,9 +207,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 async currentTournament =>
                 {
                     Player player = GetPlayerFromReactionEventOrNull(
-                        currentTournament, guildUser, cachedMessage.Id, reaction.Emote.Name);
+                        currentTournament, guildUser, cachedMessage.Id, reaction.Emote.Name, out string errorMessage);
                     if (player == null)
                     {
+                        // User should have already received an error message from the add if it was relevant.
                         return;
                     }
 
@@ -219,7 +218,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         storedTeam == player.Team &&
                         currentTournament.TryRemovePlayer(guildUser.Id))
                     {
-                        await guildUser.SendMessageAsync($"You have left the team {player.Team.Name}");
+                        await guildUser.SendMessageAsync(BotStrings.YouHaveLeftTeam(player.Team.Name));
                     }
                 });
         }
@@ -261,12 +260,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             const int emojiLimit = 9 + 26;
             if (count < 0)
             {
-                errorMessage = "Number of teams must be greater than 0.";
+                errorMessage = BotStrings.NumberOfTeamsMustBeGreaterThanZero;
                 return false;
             }
             else if (count > emojiLimit)
             {
-                errorMessage = $"Too many teams. Maximum number of teams: {emojiLimit}";
+                errorMessage = BotStrings.TooManyTeams(emojiLimit);
                 return false;
             }
 
@@ -306,25 +305,39 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         }
 
         private Player GetPlayerFromReactionEventOrNull(
-            IReadOnlyTournamentState currentTournament, IGuildUser user, ulong messageId, string emojiName)
+            IReadOnlyTournamentState currentTournament, 
+            IGuildUser user,
+            ulong messageId, 
+            string emojiName,
+            out string errorMessage)
         {
-            // TODO: since we have the message ID it's unlikely we need to verify the guild, but we should double check.
-            if (user.Id == this.Client.CurrentUser.Id ||
-                currentTournament == null ||
+            errorMessage = null;
+
+            if (currentTournament == null ||
                 !currentTournament.IsJoinTeamMessage(messageId) ||
                 !currentTournament.TryGetTeamFromSymbol(emojiName, out Team team))
             {
+                // Ignore reactions added/removed from non-team messages.
+                return null;
+            }
+
+            // TODO: since we have the message ID it's unlikely we need to verify the guild, but we should double check.
+            if (user.Id == this.Client.CurrentUser.Id)
+            {
+                errorMessage = BotStrings.BotCannotJoinAsPlayer;
                 return null;
             }
 
             ulong userId = user.Id;
             if (currentTournament.IsDirector(userId))
             {
+                errorMessage = BotStrings.TournamentDirectorCannotJoinAsPlayer;
                 return null;
             }
 
             if (currentTournament.IsReader(userId))
             {
+                errorMessage = BotStrings.ReaderCannotJoinAsPlayer;
                 return null;
             }
 
@@ -350,12 +363,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             currentTournament.AddReaders(readers);
             if (!currentTournament.Readers.Any())
             {
-                await message.Channel.SendMessageAsync("No readers added. There must be at least one reader for a tournament.");
+                await message.Channel.SendMessageAsync(BotStrings.NoReadersAddedMinimumReaderCount);
                 return;
             }
 
             await message.Channel.SendMessageAsync(
-                $"{currentTournament.Readers.Count()} readers total for the tournament.");
+                BotStrings.ReadersTotalForTournament(currentTournament.Readers.Count()));
             await this.UpdateStage(currentTournament, TournamentStage.SetRoundRobins, message.Channel);
         }
 
@@ -367,7 +380,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
             else if (rounds <= 0 || rounds > TournamentState.MaxRoundRobins)
             {
-                await message.Channel.SendMessageAsync($"Invalid number of round robins. The number must be between 1 and {TournamentState.MaxRoundRobins}");
+                await message.Channel.SendMessageAsync(
+                    BotStrings.InvalidNumberOfRoundRobins(TournamentState.MaxRoundRobins));
                 return;
             }
 
@@ -405,7 +419,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             int teamsCount = currentTournament.Teams.Count();
             if (teamsCount < 2)
             {
-                await message.Channel.SendMessageAsync("There must be at least two teams for a tournament. Specify more teams.");
+                await message.Channel.SendMessageAsync(BotStrings.MustBeTwoTeamsPerTournament);
                 currentTournament.RemoveTeams(teams);
                 return;
             }
@@ -414,8 +428,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (teamsCount > maxTeamsCount)
             {
                 currentTournament.TryClearTeams();
-                await message.Channel.SendMessageAsync(
-                    $"There are too many teams. This bot can only handle {maxTeamsCount}-team tournaments. None of the teams have been added.");
+                await message.Channel.SendMessageAsync(BotStrings.TooManyTeams(maxTeamsCount));
                 return;
             }
 
@@ -423,8 +436,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 // Something very strange has happened. Undo the addition and tell the user.
                 currentTournament.TryClearTeams();
-                await message.Channel.SendMessageAsync(
-                    $"Unexpected failure adding teams: '{errorMessage}'. None of the teams have been added.");
+                await message.Channel.SendMessageAsync(BotStrings.UnexpectedErrorAddingTeams(errorMessage));
                 return;
             }
 
@@ -446,8 +458,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             for (int i = 0; i < addPlayersEmbedsCount; i++)
             {
                 EmbedBuilder embedBuilder = new EmbedBuilder();
-                embedBuilder.Title = "Join Teams";
-                embedBuilder.Description = "Click on the reactions corresponding to your team to join it.";
+                embedBuilder.Title = BotStrings.JoinTeams;
+                embedBuilder.Description = BotStrings.ClickOnReactionsJoinTeam;
                 int fieldCount = 0;
                 List<IEmote> emotesForMessage = new List<IEmote>();
                 while (fieldCount < MaxTeamsInMessage && teamsEnumerator.MoveNext())
