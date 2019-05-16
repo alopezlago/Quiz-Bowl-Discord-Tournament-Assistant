@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
 using QBDiscordAssistant.Tournament;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -51,11 +52,16 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Context = context;
             this.GlobalManager = globalManager;
+            this.Logger = Log
+                .ForContext<BotCommandHandler>()
+                .ForContext("guildId", this.Context.Guild.Id);
         }
 
         private ICommandContext Context { get; }
 
         private GlobalTournamentsManager GlobalManager { get; }
+
+        private ILogger Logger { get; }
 
         public Task AddPlayer(IGuildUser user, string teamName)
         {
@@ -71,15 +77,17 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         };
                         if (currentTournament.TryAddPlayer(player))
                         {
+                            this.Logger.Debug("Player {id} successfully added to team {teamName}", user.Id, teamName);
                             return this.SendUserMessage(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
                         }
                         else
                         {
+                            this.Logger.Debug("Player {id} already on team; not added to {teamName}", user.Id, teamName);
                             return this.SendUserMessage(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
                         }
                     }
 
-
+                    this.Logger.Debug("Player {id} could not be added to nonexistent {teamName}", user.Id, teamName);
                     return this.SendUserMessage(BotStrings.TeamDoesNotExist(teamName));
                 });
         }
@@ -88,6 +96,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             if (string.IsNullOrWhiteSpace(tournamentName))
             {
+                this.Logger.Debug("Did not add {id} to tournament with blank name", newDirector.Id);
                 return Task.CompletedTask;
             }
 
@@ -109,10 +118,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             // after RoleSetup we should give them the TD role.
             if (updateSuccessful)
             {
+                this.Logger.Debug(
+                    "Added {id} as a tournament director for {tournamentName}", newDirector.Id, tournamentName);
                 return this.SendUserMessage(
                     BotStrings.AddTournamentDirectorSuccessful(tournamentName, this.Context.Guild.Name));
             }
 
+            this.Logger.Debug(
+                "{id} already a tournament director for {tournamentName}", newDirector.Id, tournamentName);
             return this.SendUserMessage(
                 BotStrings.UserAlreadyTournamentDirector(tournamentName, this.Context.Guild.Name));
         }
@@ -148,6 +161,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             break;
                         default:
                             // Nothing to go back to, so do nothing.
+                            this.Logger.Debug("Could not go back on stage {stage}", currentTournament.Stage);
                             await this.SendUserMessage(BotStrings.CannotGoBack(currentTournament.Stage));
                             return;
                     }
@@ -160,6 +174,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public async Task ClearAll()
         {
             await CleanupAllPossibleTournamentArtifacts();
+            this.Logger.Debug("All tournament artifacts cleared");
             await this.SendUserMessage(BotStrings.AllPossibleTournamentArtifactsCleaned(this.Context.Guild.Name));
         }
 
@@ -171,10 +186,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             TournamentsManager manager = this.GlobalManager.GetOrAdd(this.Context.Guild.Id, CreateTournamentsManager);
             if (!manager.TryClearCurrentTournament())
             {
+                this.Logger.Debug("Tournament cleanup failed");
                 await this.SendUserMessage(BotStrings.TournamentWasNotRemoved);
                 return;
             }
 
+            this.Logger.Debug("Tournament cleanup finished");
             await this.SendUserMessage(BotStrings.TournamentCleanupFinished(this.Context.Guild.Name));
         }
 
@@ -186,18 +203,22 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     if (currentTournament?.Stage != TournamentStage.RunningPrelims)
                     {
+                        this.Logger.Debug("Could not start finals in stage {stage}", currentTournament?.Stage);
                         await this.SendUserMessage(BotStrings.ErrorFinalsOnlySetDuringPrelims);
                         return;
                     }
 
                     if (!currentTournament.TryGetReader(readerUser.Id, out Reader reader))
                     {
+                        this.Logger.Debug("Could not start finals because {1} is not a reader", readerUser.Id);
                         await this.SendUserMessage(BotStrings.ErrorGivenUserIsntAReader);
                         return;
                     }
 
                     if (rawTeamNameParts == null)
                     {
+                        this.Logger.Debug(
+                            "Could not start finals because no teams were specified");
                         await this.SendUserMessage(BotStrings.ErrorNoTeamsSpecified);
                         return;
                     }
@@ -206,12 +227,16 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!TeamNameParser.TryGetTeamNamesFromParts(
                         combinedTeamNames, out IList<string> teamNames, out string errorMessage))
                     {
+                        this.Logger.Debug(
+                            "Could not start finals because of this error: {errorMessage}", errorMessage);
                         await this.SendUserMessage(BotStrings.ErrorGenericMessage(errorMessage));
                         return;
                     }
 
                     if (teamNames.Count != 2)
                     {
+                        this.Logger.Debug(
+                            "Could not start finals because {count} teams were specified", teamNames.Count);
                         await this.SendUserMessage(BotStrings.ErrorTwoTeamsMustBeSpecifiedFinals(teamNames.Count));
                         return;
                     }
@@ -223,7 +248,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         .ToArray();
                     if (currentTournament.Teams.Intersect(teams).Count() != teams.Length)
                     {
-                        // TODO: Improve error message by explicitly searching for the missing team.
+                        this.Logger.Debug(
+                            "Could not start finals because some teams were not in the tournament", teamNames.Count);
                         await this.SendUserMessage(
                             BotStrings.ErrorAtLeastOneTeamNotInTournament(string.Join(", ", teamNames)));
                         return;
@@ -286,6 +312,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (channel != null)
             {
+                this.Logger.Debug("Finals started successfully");
                 await this.Context.Channel.SendMessageAsync(BotStrings.FinalsParticipantsPleaseJoin(channel.Mention));
             }
         }
@@ -316,10 +343,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (teamsAndPlayers == null)
             {
+                this.Logger.Debug("Unable to get players because we could not access the current tournament");
                 return;
             }
             else if (!teamsAndPlayers.Any())
             {
+                this.Logger.Debug("Unable to get players because there are no teams yet");
                 await this.SendUserMessage(BotStrings.NoTeamsYet);
                 return;
             }
@@ -330,6 +359,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 .Select(teamPlayer => this.GetTeamPlayersLine(teamPlayer)));
             string content = string.Join(Environment.NewLine, teamPlayerLines);
             await this.SendUserMessage(content);
+            this.Logger.Debug("Current players returned successfully");
         }
 
         public Task RemovePlayer(IGuildUser user)
@@ -339,9 +369,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     if (currentTournament.TryRemovePlayer(user.Id))
                     {
+                        this.Logger.Debug("Player {id} was removed from the tournament", user.Id);
                         return this.SendUserMessage(BotStrings.PlayerRemoved(user.Mention));
                     }
 
+                    this.Logger.Debug("Player {id} wasn't on any team", user.Id);
                     return this.SendUserMessage(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
                 });
         }
@@ -350,6 +382,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             if (string.IsNullOrWhiteSpace(tournamentName))
             {
+                this.Logger.Debug("Couldn't remove director {id} for tournament with blank name", oldDirector.Id);
                 return;
             }
 
@@ -361,6 +394,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             IDMChannel dmChannel = await this.Context.User.GetOrCreateDMChannelAsync();
             if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
             {
+                this.Logger.Debug(
+                    "Couldn't remove director {id} for nonexistent tournament {tournamentName}", 
+                    oldDirector.Id, 
+                    tournamentName);
                 await dmChannel.SendMessageAsync(
                     BotStrings.TournamentDoesNotExist(tournamentName, this.Context.Guild.Name));
                 return;
@@ -368,11 +405,17 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (state.TryRemoveDirector(oldDirector.Id))
             {
+                this.Logger.Debug(
+                    "Removed {id} as a tournament director for {tournamentName}", oldDirector.Id, tournamentName);
                 await dmChannel.SendMessageAsync(
                     BotStrings.RemovedTournamentDirector(tournamentName, this.Context.Guild.Name));
                 return;
             }
 
+            this.Logger.Debug(
+                "User {id} is not a director for {tournamentName}, so could not be removed", 
+                oldDirector.Id, 
+                tournamentName);
             await dmChannel.SendMessageAsync(
                 BotStrings.UserNotTournamentDirector(tournamentName, this.Context.Guild.Name));
         }
@@ -383,6 +426,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             // make anything inconsistent.
             if (string.IsNullOrEmpty(tournamentName))
             {
+                this.Logger.Debug("Couldn't setup with blank name");
                 return Task.CompletedTask;
             }
 
@@ -390,6 +434,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (!manager.TrySetCurrentTournament(tournamentName, out string errorMessage))
             {
+                this.Logger.Debug("Error when setting up tournament: {errorMessage}", errorMessage);
                 return this.SendUserMessage(
                     BotStrings.ErrorSettingCurrentTournament(this.Context.Guild.Name, errorMessage));
             }
@@ -407,6 +452,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (currentTournament?.Stage != TournamentStage.AddPlayers)
                     {
                         // !start only applies once we've started adding players
+                        this.Logger.Debug("Start failed because we were in stage {stage}", currentTournament?.Stage);
                         await this.SendUserMessage(BotStrings.CommandOnlyUsedTournamentReadyStart);
                         return;
                     }
@@ -416,6 +462,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     try
                     {
                         // TODO: Add more messaging around the current status
+                        this.Logger.Debug("Generating tournament");
                         IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
                             currentTournament.RoundRobinsCount);
 
@@ -423,16 +470,18 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             new HashSet<Team>(currentTournament.Teams),
                             new HashSet<Reader>(currentTournament.Readers));
 
+                        this.Logger.Debug("Tournament generated. Creating channels and roles");
                         await this.Context.Channel.SendMessageAsync(BotStrings.CreatingChannelsAndRoles);
                         await this.CreateArtifacts(currentTournament);
 
                         await UpdateStage(currentTournament, TournamentStage.RunningPrelims);
                         startSucceeded = true;
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
                         // TODO: Make the exceptions we catch more defined.
                         // Go back to the previous stage and undo any artifacts added.
+                        this.Logger.Error(ex, "Error starting the tournament. Cleaning up the tournament artifacts");
                         await CleanupTournamentArtifacts(currentTournament);
                         await UpdateStage(currentTournament, TournamentStage.AddPlayers);
                         throw;
@@ -545,6 +594,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private async Task<Dictionary<Team, IRole>> AssignPlayerRoles(
             ITournamentState state, IDictionary<ulong, IGuildUser> users)
         {
+            this.Logger.Debug("Creating team roles");
             List<Task<KeyValuePair<Team, IRole>>> addTeamRoleTasks = new List<Task<KeyValuePair<Team, IRole>>>();
             foreach (Team team in state.Teams)
             {
@@ -553,19 +603,21 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             IEnumerable<KeyValuePair<Team, IRole>> teamRolePairs = await Task.WhenAll(addTeamRoleTasks);
             Dictionary<Team, IRole> teamRoles = new Dictionary<Team, IRole>(teamRolePairs);
+            this.Logger.Debug("Team roles created");
 
+            this.Logger.Debug("Assigning player roles");
             List<Task> assignPlayerRoleTasks = new List<Task>();
             foreach (Player player in state.Players)
             {
                 if (!teamRoles.TryGetValue(player.Team, out IRole role))
                 {
-                    Console.Error.WriteLine($"Player {player.Id} does not have a team role for team {player.Team}.");
+                    this.Logger.Warning("Player {0} does not have a team role for team {1}", player.Id, player.Team);
                     continue;
                 }
 
                 if (!users.TryGetValue(player.Id, out IGuildUser user))
                 {
-                    Console.Error.WriteLine($"Player {player.Id} does not have a IGuildUser.");
+                    this.Logger.Warning("Player {id} does not have a IGuildUser", player.Id);
                     continue;
                 }
 
@@ -573,11 +625,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             await Task.WhenAll(assignPlayerRoleTasks);
+            this.Logger.Debug("Finished assigning player roles");
             return teamRoles;
         }
 
         private async Task<IRole> AssignDirectorRole(ITournamentState state, IDictionary<ulong, IGuildUser> users)
         {
+            this.Logger.Debug("Assigning director roles to {ids}", state.DirectorIds);
             IRole role = await this.Context.Guild.CreateRoleAsync(
                 DirectorRoleName, permissions: PrivilegedGuildPermissions, color: Color.Gold);
             List<Task> assignRoleTasks = new List<Task>();
@@ -589,16 +643,18 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 }
                 else
                 {
-                    Console.Error.WriteLine($"Could not find director with ID {directorId}");
+                    this.Logger.Warning("Could not find director {id}", directorId);
                 }
             }
 
             await Task.WhenAll(assignRoleTasks);
+            this.Logger.Debug("Finished assigning director roles");
             return role;
         }
 
-        private Task<IRole[]> AssignRoomReaderRoles(ITournamentState state, IDictionary<ulong, IGuildUser> members)
+        private async Task<IRole[]> AssignRoomReaderRoles(ITournamentState state, IDictionary<ulong, IGuildUser> members)
         {
+            this.Logger.Debug("Assigning room reader roles to the readers");
             int roomsCount = state.Teams.Count() / 2;
             Task<IRole>[] roomReaderRoleTasks = new Task<IRole>[roomsCount];
             IEnumerator<Reader> readers = state.Readers.GetEnumerator();
@@ -609,7 +665,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     GetRoomReaderRoleName(i), readers.Current.Id, members);
             }
 
-            return Task.WhenAll(roomReaderRoleTasks);
+            IRole[] roles = await Task.WhenAll(roomReaderRoleTasks);
+            this.Logger.Debug("Finished assigning room reader roles to the readers");
+            return roles;
         }
 
         private async Task<IRole> AssignRoomReaderRole(string roleName, ulong readerId, IDictionary<ulong, IGuildUser> members)
@@ -649,8 +707,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 }
             }
 
+            this.Logger.Debug("Deleting all channels other than the main channel");
             await Task.WhenAll(deleteChannelTasks);
+            this.Logger.Debug("Channels deleted. Deleting all roles created by any tournament");
             await Task.WhenAll(deleteRoleTasks);
+            this.Logger.Debug("Roles for any tournament deleted");
             // We don't need to update the tournament stage because this should be used when the tournament is
             // completed or no longer exists 
         }
@@ -682,7 +743,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 deleteRoleTasks = new Task[0];
             }
 
+            this.Logger.Debug("Deleting all channels and roles created by the tournament {name}", state.Name);
             await Task.WhenAll(deleteChannelTasks.Concat(deleteRoleTasks));
+            this.Logger.Debug("All channels and roles created by the tournament {name} are deleted", state.Name);
             await UpdateStage(state, TournamentStage.Complete);
         }
 
@@ -762,6 +825,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             ICategoryChannel parent, Game game, TournamentRoles roles, int roundNumber, int roomNumber)
         {
             // The room and role names will be the same.
+            this.Logger.Debug("Creating text channel for room {0} in round {1}", roomNumber, roundNumber);
             string name = GetTextRoomName(game.Reader, roundNumber);
             ITextChannel channel = await this.Context.Guild.CreateTextChannelAsync(
                 name,
@@ -769,7 +833,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     channelProps.CategoryId = parent.Id;
                 });
+            this.Logger.Debug("Text channel for room {0} in round {1} created", roomNumber, roundNumber);
 
+            this.Logger.Debug("Adding permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
             await channel.AddPermissionOverwriteAsync(this.Context.Guild.EveryoneRole, EveryonePermissions);
 
             // TODO: Give the bot less-than-privileged permissions.
@@ -782,7 +848,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 if (!roles.TeamRoles.TryGetValue(team, out IRole role))
                 {
-                    Console.Error.WriteLine($"Team {team.Name} did not have a role defined.");
+                    this.Logger.Warning("Team {name} did not have a role defined.", team.Name);
                     continue;
                 }
 
@@ -790,12 +856,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             await Task.WhenAll(addTeamRolesToChannel);
+            this.Logger.Debug("Added permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
             return channel;
         }
 
         private async Task<IVoiceChannel> CreateVoiceChannel(
             ICategoryChannel parent, TournamentRoles roles, Reader reader)
         {
+            this.Logger.Debug("Creating voice channel for reader {id}", reader.Id);
             string name = GetVoiceRoomName(reader);
             // TODO: Verify this creates the channel under the category
             IVoiceChannel channel = await this.Context.Guild.CreateVoiceChannelAsync(
@@ -804,6 +872,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     channelProps.CategoryId = parent.Id;
                 });
+            this.Logger.Debug("Voice channel for reader {id} created", reader.Id);
             return channel;
         }
 
@@ -845,6 +914,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             embedBuilder.Title = title;
             embedBuilder.Description = instructions;
             await this.Context.Channel.SendMessageAsync(embed: embedBuilder.Build());
+            this.Logger.Debug("Moved to stage {stage}", stage);
         }
 
         private class TournamentRoles

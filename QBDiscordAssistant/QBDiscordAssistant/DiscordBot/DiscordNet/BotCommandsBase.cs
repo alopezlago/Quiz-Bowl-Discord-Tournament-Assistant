@@ -1,4 +1,5 @@
 ﻿using Discord.Commands;
+using Serilog;
 using System;
 using System.Threading.Tasks;
 
@@ -10,9 +11,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public BotCommandsBase(GlobalTournamentsManager globalManager)
         {
             this.GlobalManager = globalManager;
+            this.Logger = Log.ForContext(this.GetType());
         }
 
         protected GlobalTournamentsManager GlobalManager { get; }
+
+        protected ILogger Logger { get; }
 
         protected Task HandleCommand(Func<BotCommandHandler, Task> handleCommandFunction)
         {

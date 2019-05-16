@@ -1,4 +1,7 @@
 using Newtonsoft.Json;
+using Serilog;
+using Serilog.Events;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -6,6 +9,9 @@ namespace QBDiscordAssistant
 {
     class Program
     {
+        // 200 MB file limit
+        const long maxLogfileSize = 1024 * 1024 * 200;
+
         // Following the example from https://dsharpplus.emzi0767.com/articles/first_bot.html
         static void Main(string[] args)
         {
@@ -14,8 +20,32 @@ namespace QBDiscordAssistant
 
         static async Task MainAsync(string[] args)
         {
+            LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
+                .WriteTo.Console()
+                .WriteTo.File(
+                    @"logs\bot.log",
+                    fileSizeLimitBytes: maxLogfileSize,
+                    retainedFileCountLimit: 10);
 
-            BotConfiguration configuration = await GetConfiguration();
+            BotConfiguration configuration;
+            try
+            {
+                configuration = await GetConfiguration();
+            }
+            catch (Exception ex)
+            {
+                Log.Logger = loggerConfiguration
+                    .MinimumLevel.Debug()
+                    .CreateLogger();
+                Log.Error(ex, "Failed to read configuration.");
+                throw;
+            }
+
+            Log.Logger = loggerConfiguration
+                .MinimumLevel.Is(configuration.LogEventLevel)
+                .CreateLogger();
+            Log.Information("Bot started with log event level {0}", configuration.LogEventLevel);
+
             using (DiscordBot.DiscordNet.Bot bot = new DiscordBot.DiscordNet.Bot(configuration))
             {
                 await bot.ConnectAsync();
@@ -23,6 +53,8 @@ namespace QBDiscordAssistant
                 // Never leave.
                 await Task.Delay(-1);
             }
+
+            Log.Information("Bot escaped infinite delay. Should investigate");
         }
 
         static async Task<BotConfiguration> GetConfiguration()
@@ -45,7 +77,8 @@ namespace QBDiscordAssistant
                 return new BotConfiguration()
                 {
                     BotToken = botToken,
-                    MainChannelName = "general"
+                    MainChannelName = "general",
+                    LogEventLevel = LogEventLevel.Debug
                 };
             }
         }

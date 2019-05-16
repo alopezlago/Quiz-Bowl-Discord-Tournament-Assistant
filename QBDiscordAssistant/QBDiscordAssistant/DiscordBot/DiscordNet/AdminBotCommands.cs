@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.Commands;
+using Serilog;
 using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
@@ -21,6 +22,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             [Summary("Member to add as the tournament director (as a @mention).")] IGuildUser newDirector,
             [Remainder] [Summary("Name of the tournament.")] string tournamentName)
         {
+            this.Logger.Information(
+                "{0} adding TD {1} for {2}", this.Context.User.Id, newDirector.Id, tournamentName);
             return this.HandleCommand(commandHandler => commandHandler.AddTournamentDirector(newDirector, tournamentName));
         }
 
@@ -28,17 +31,21 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         [Command("removeTD")]
         [Summary("Removes a tournament director from a tournament.")]
         public Task RemoveTournamentDirector(
-            [Summary("Member to add as the tournament director (as a @mention).")] IGuildUser newDirector,
+            [Summary("Member to add as the tournament director (as a @mention).")] IGuildUser oldDirector,
             [Summary("Name of the tournament.")] string tournamentName)
         {
+            this.Logger.Information(
+                "{0} removing TD {1} for {2}", this.Context.User.Id, oldDirector.Id, tournamentName);
             return this.HandleCommand(commandHandler => commandHandler.RemoveTournamentDirector(
-                newDirector, tournamentName));
+                oldDirector, tournamentName));
         }
 
         [Command("clearAll")]
         [Summary("Clears all leftover channels and roles from a tournament that didn't end cleanly.")]
         public Task ClearAll()
         {
+            this.Logger.Information(
+                "{0} clearing everything in channel {1}", this.Context.User.Id, this.Context.Channel.Id);
             return this.HandleCommand(commandHandler => commandHandler.ClearAll());
         }
     }

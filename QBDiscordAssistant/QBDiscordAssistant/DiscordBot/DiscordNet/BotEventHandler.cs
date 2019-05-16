@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using QBDiscordAssistant.Tournament;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -28,6 +29,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             this.Client.MessageReceived += this.OnMessageReceived;
             this.Client.ReactionAdded += this.OnReactionAdded;
             this.Client.ReactionRemoved += this.OnReactionRemoved;
+
+            this.Logger = Log.ForContext<BotEventHandler>();
         }
 
         // TODO: Add wrapper class/interface for the client to let us test the event handlers.
@@ -37,10 +40,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private GlobalTournamentsManager GlobalManager { get; }
 
+        private ILogger Logger { get; }
+
         public void Dispose()
         {
             if (!this.IsDisposed)
             {
+                this.Logger.Verbose("Disposing");
                 this.IsDisposed = true;
                 this.Client.MessageReceived += this.OnMessageReceived;
                 this.Client.ReactionAdded += this.OnReactionAdded;
@@ -54,11 +60,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (message.Content.TrimStart().StartsWith("!"))
             {
                 // Ignore commands
+                this.Logger.Verbose("Message ignored because it's a command");
                 return;
             }
 
             if (message.Author.Id == this.Client.CurrentUser.Id)
             {
+                this.Logger.Verbose("Message ignored because it's from the bot");
                 return;
             }
 
@@ -67,6 +75,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 userMessage.Channel is IGuildChannel guildChannel &&
                 userMessage.Author is IGuildUser guildUser))
             {
+                this.Logger.Verbose("Message ignored because it's not in a guild");
                 return;
             }
 
@@ -79,6 +88,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             Result<bool> currentTournamentExists = manager.TryReadActionOnCurrentTournament(currentTournament => true);
             if (!currentTournamentExists.Success)
             {
+                this.Logger.Verbose("Message ignored because no current tournament is running");
                 return;
             }
 
@@ -88,6 +98,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 currentTournament => HasTournamentDirectorPrivileges(currentTournament, guildChannel, guildUser));
             if (!(hasDirectorPrivileges.Success && hasDirectorPrivileges.Value))
             {
+                this.Logger.Verbose(
+                    "Message ignored because user {id} does not have tournament director privileges", guildUser.Id);
                 return;
             }
 
@@ -111,6 +123,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             await this.HandleAddTeamsStage(currentTournament, message);
                             break;
                         default:
+                            this.Logger.Verbose(
+                                "Message ignored because it is during the stage {stage}", currentTournament.Stage);
                             break;
                     }
                 });
@@ -129,11 +143,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!(reaction.Channel is IGuildChannel guildChannel))
             {
                 // Only listen to guild reacts.
+                this.Logger.Verbose("Reaction addition ignored because it wasn't on a guild channel");
                 return;
             }
 
             if (!(reaction.User.IsSpecified && reaction.User.Value is IGuildUser guildUser))
             {
+                this.Logger.Verbose("Reaction addition ignored because it wasn't by a guild user");
                 return;
             }
 
@@ -150,6 +166,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (player == null)
                     {
                         // TODO: we may want to remove the reaction if it's on our team-join messages.
+                        this.Logger.Verbose(
+                            "Reaction addition ignored because it wasn't by a player. Message: {errorMessage}",
+                            errorMessage);
                         return;
                     }
 
@@ -167,10 +186,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 Task deleteReactionTask = message.RemoveReactionAsync(reaction.Emote, guildUser);
                 Task sendMessageTask = guildUser.SendMessageAsync(errorMessage);
                 await Task.WhenAll(deleteReactionTask, sendMessageTask);
+                this.Logger.Verbose("Reaction removed. Message: {errorMessage}", errorMessage);
                 return;
             }
             else if (player != null)
             {
+                this.Logger.Debug("Player {id} joined team {name}", player.Id, player.Team.Name);
                 await guildUser.SendMessageAsync(BotStrings.YouHaveJoinedTeam(player.Team.Name));
             }
         }
@@ -187,11 +208,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!(reaction.Channel is IGuildChannel guildChannel))
             {
                 // Only listen to guild reacts.
+                this.Logger.Verbose("Reaction removal ignored because it wasn't on a guild channel");
                 return;
             }
 
             if (!(reaction.User.IsSpecified && reaction.User.Value is IGuildUser guildUser))
             {
+                this.Logger.Verbose("Reaction removal ignored because it wasn't by a guild user");
                 return;
             }
 
@@ -211,6 +234,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (player == null)
                     {
                         // User should have already received an error message from the add if it was relevant.
+                        this.Logger.Verbose(
+                            "Reaction addition ignored because it wasn't by a player. Message: {errorMessage}",
+                            errorMessage);
                         return;
                     }
 
@@ -218,6 +244,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         storedTeam == player.Team &&
                         currentTournament.TryRemovePlayer(guildUser.Id))
                     {
+                        this.Logger.Debug("Player {id} left team {name}", player.Id, player.Team.Name);
                         await guildUser.SendMessageAsync(BotStrings.YouHaveLeftTeam(player.Team.Name));
                     }
                 });
@@ -363,6 +390,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             currentTournament.AddReaders(readers);
             if (!currentTournament.Readers.Any())
             {
+                this.Logger.Debug("No readers specified, so staying in the AddReaders stage");
                 await message.Channel.SendMessageAsync(BotStrings.NoReadersAddedMinimumReaderCount);
                 return;
             }
@@ -376,10 +404,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             if (!int.TryParse(message.Content, out int rounds))
             {
+                this.Logger.Debug("Round robin count specified couldn't be parsed as an int");
                 return;
             }
             else if (rounds <= 0 || rounds > TournamentState.MaxRoundRobins)
             {
+                this.Logger.Debug("Round robin count ({0}) specified is invalid", rounds);
                 await message.Channel.SendMessageAsync(
                     BotStrings.InvalidNumberOfRoundRobins(TournamentState.MaxRoundRobins));
                 return;
@@ -403,6 +433,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     teamList, out IList<string> newTeamNames, out errorMessage))
                 {
                     await message.Channel.SendMessageAsync(errorMessage);
+                    this.Logger.Debug("Team names could not be parsed. Error message: {errorMessage}", errorMessage);
                     return;
                 }
 
@@ -421,6 +452,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 await message.Channel.SendMessageAsync(BotStrings.MustBeTwoTeamsPerTournament);
                 currentTournament.RemoveTeams(teams);
+                this.Logger.Debug("Too few teams specified in AddTeams stage ({0})", teamsCount);
                 return;
             }
 
@@ -429,6 +461,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 currentTournament.TryClearTeams();
                 await message.Channel.SendMessageAsync(BotStrings.TooManyTeams(maxTeamsCount));
+                this.Logger.Debug("Too many teams specified in AddTeams stage ({0})", teamsCount);
                 return;
             }
 
@@ -437,6 +470,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 // Something very strange has happened. Undo the addition and tell the user.
                 currentTournament.TryClearTeams();
                 await message.Channel.SendMessageAsync(BotStrings.UnexpectedErrorAddingTeams(errorMessage));
+                this.Logger.Debug("Couldn't get emojis in AddTeams stage. Error message: {errorMessage}", errorMessage);
                 return;
             }
 
@@ -482,6 +516,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             await Task.WhenAll(addReactionsTasks);
+            this.Logger.Debug("All reactions added for add players stage");
         }
 
         private Task OnMessageReceived(SocketMessage message)
@@ -513,6 +548,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             addTeamsEmbedBuilder.Title = title;
             addTeamsEmbedBuilder.Description = instructions;
             await channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
+            this.Logger.Debug("Moved to stage {stage}", stage);
         }
 
         private static TournamentsManager CreateTournamentsManager(ulong id)
