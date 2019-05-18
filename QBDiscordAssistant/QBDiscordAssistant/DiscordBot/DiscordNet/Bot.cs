@@ -2,6 +2,8 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
+using Serilog.Events;
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -28,6 +30,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 LogLevel = LogSeverity.Info
             });
 
+            this.Logger = Log.ForContext(this.GetType());
+
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             IServiceCollection serviceCollection = new ServiceCollection();
             serviceCollection.AddSingleton(this.Client);
@@ -50,12 +54,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private BotConfiguration Configuration { get; }
 
+        private ILogger Logger { get; }
+
         private IServiceProvider ServiceProvider { get; }
 
         public async Task ConnectAsync()
         {
             string token = this.Configuration.BotToken;
-            this.Client.Log += this.Log;
+            this.Client.Log += this.LogMessage;
 
             // TODO: move this code to BotEventHandler. This does require rewriting a fair amount of the event handlers,
             // since we need to use a socket client in it.
@@ -74,40 +80,67 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (this.Client != null)
             {
-                this.Client.Log -= this.Log;
+                this.Client.Log -= this.LogMessage;
                 this.Client.MessageReceived -= this.OnMessageReceived;
                 this.Client.Dispose();
                 this.Client = null;
             }
         }
 
-        private Task Log(LogMessage message)
+        private static LogEventLevel ConvertLogLevels(LogSeverity discordSeverity)
         {
-            Console.WriteLine($"{DateTime.UtcNow}: Severity {message.Severity.ToString()}: {message.Message}");
+            switch (discordSeverity)
+            {
+                case LogSeverity.Critical:
+                    return LogEventLevel.Fatal;
+                case LogSeverity.Error:
+                    return LogEventLevel.Error;
+                case LogSeverity.Warning:
+                    return LogEventLevel.Warning;
+                case LogSeverity.Info:
+                    return LogEventLevel.Information;
+                case LogSeverity.Verbose:
+                    // Verbose and Debug are swapped between the two levels. Verbose is for debug level events
+                    return LogEventLevel.Debug;
+                case LogSeverity.Debug:
+                    return LogEventLevel.Verbose;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(discordSeverity));
+            }
+        }
+
+        private Task LogMessage(LogMessage message)
+        {
+            LogEventLevel logLevel = ConvertLogLevels(message.Severity);
+            this.Logger.Write(logLevel, "Discord.Net message: {0}", message.Message);
             if (message.Exception != null)
             {
-                Console.WriteLine($"Exception: {message.Exception.Message}\n{message.Exception.StackTrace}");
+                this.Logger.Write(logLevel, message.Exception, "Exception occurred on Discord.Net side");
             }
 
             return Task.CompletedTask;
         }
 
-        private Task OnMessageReceived(SocketMessage message)
+        private async Task OnMessageReceived(SocketMessage message)
         {
             if (message.Author.Id == this.Client.CurrentUser.Id || !(message is IUserMessage userMessage))
             {
-                return Task.CompletedTask;
+                return;
             }
 
             int argPosition = 0;
             if (!userMessage.HasCharPrefix('!', ref argPosition))
             {
                 // Do nothing for now.
-                return Task.CompletedTask;
+                return;
             }
 
             ICommandContext context = new CommandContext(this.Client, userMessage);
-            return this.CommandService.ExecuteAsync(context, argPosition, this.ServiceProvider);
+            IResult result = await this.CommandService.ExecuteAsync(context, argPosition, this.ServiceProvider);
+            if (result.Error == CommandError.Exception && result is ExecuteResult executeResult)
+            {
+                this.Logger.Error(executeResult.Exception, "Exception occurred in comand handler");
+            }
         }
     }
 }

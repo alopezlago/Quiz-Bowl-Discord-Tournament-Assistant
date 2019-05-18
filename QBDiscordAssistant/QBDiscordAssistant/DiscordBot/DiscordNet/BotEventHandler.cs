@@ -250,12 +250,23 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 });
         }
 
-        private static Task HandleEvent(Func<Task> handler)
+        private Task HandleEvent(Func<Task> handler)
         {
             // Discord.Net complains if a task takes too long while handling the command. Since the current tournament
             // is protected by a mutex, it may take a long time to get access to it. As a result, we run the event
             // handler in a separate thread.
-            Task.Run(async () => await handler());
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await handler();
+                }
+                catch (Exception e)
+                {
+                    this.Logger.Error(e, "Exception when handling events");
+                    throw;
+                }
+            });
 
             // If we return the task created by Task.Run the event handler will still be blocked. It seems like
             // Discord.Net will wait for the returned task to complete, which will block the Discord.Net's event

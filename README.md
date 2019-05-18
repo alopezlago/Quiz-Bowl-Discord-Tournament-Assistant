@@ -43,8 +43,7 @@ Starting a tournament:
   10. To end the tournament, use !end
     !end
 
-TODO: Add unit testing for message handling.
-TODO: Add more hardening, e.g. if exceptions are thrown in the command module, reset the state gracefully (if possible).
+TODO: Add unit testing for message handling. Unless we add wrapper classes for SocketMessage/BaseSocketClient/etc., this will have to wait until Discord.Net supports interfaces for these.
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
 TODO: Track member name changes so we can update reader/player names.
 TODO: Have an option to allow for more automation, that would enable:
