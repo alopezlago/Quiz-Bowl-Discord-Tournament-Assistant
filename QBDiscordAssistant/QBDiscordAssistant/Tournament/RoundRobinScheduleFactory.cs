@@ -119,9 +119,19 @@ namespace QBDiscordAssistant.Tournament
 
         private void AddBracketGamesToRound(Round round, Bracket bracket, int roundNumber)
         {
-            using (IEnumerator<Reader> readers = bracket.Readers.GetEnumerator())
+            IEnumerable<Reader> readersEnumerable = bracket.Readers;
+            if (roundNumber % 2 == 1)
             {
-                GenerateGameForRound(round, readers, roundNumber, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
+                // Reverse the readers every other round. This should ensure that, when there are over 4 teams, that no
+                // team has the same reader each round
+                // This approach does have the downside of doing O(|readers|) work every other round. If this is too
+                // slow, we should save the reversed enumerable, then pass both in.
+                readersEnumerable = readersEnumerable.Reverse();
+            }
+
+            using (IEnumerator<Reader> readers = readersEnumerable.GetEnumerator())
+            {
+                GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
             }
         }
 
@@ -167,7 +177,7 @@ namespace QBDiscordAssistant.Tournament
         }
 
         private void GenerateGameForRound(
-            Round round, IEnumerator<Reader> readers, int roundNumber, Team[] topRow, Team[] bottomRow, bool hasBye)
+            Round round, IEnumerator<Reader> readers, Team[] topRow, Team[] bottomRow, bool hasBye)
         {
             int gamesCount = hasBye ? topRow.Length - 1 : topRow.Length;
             for (int i = 0; i < topRow.Length; i++)
