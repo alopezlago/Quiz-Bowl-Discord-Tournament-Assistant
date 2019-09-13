@@ -13,8 +13,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     public class BotEventHandler : IDisposable
     {
-        private const int TeamCountLimit = 9 + 26;
-        private const int ReaderCountLimit = TeamCountLimit / 2;
         private const int MaxTeamsInMessage = 20;
 
         // TODO: Add wrapper class/interface for the client to let us test the event handlers.
@@ -183,7 +181,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 // emojis permission?). This would also require a map from userIds/Players to emojis in the tournament
                 // state. The Reactions collection doesn't have information on who added it, and iterating through each
                 // emoji to see if the user was there would be slow.
-                Task deleteReactionTask = message.RemoveReactionAsync(reaction.Emote, guildUser);
+                Task deleteReactionTask = message.RemoveReactionAsync(
+                    reaction.Emote, guildUser, RequestOptionsSettings.Default);
                 Task sendMessageTask = guildUser.SendMessageAsync(errorMessage);
                 await Task.WhenAll(deleteReactionTask, sendMessageTask);
                 this.Logger.Verbose("Reaction removed. Message: {errorMessage}", errorMessage);
@@ -245,7 +244,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         currentTournament.TryRemovePlayer(guildUser.Id))
                     {
                         this.Logger.Debug("Player {id} left team {name}", player.Id, player.Team.Name);
-                        await guildUser.SendMessageAsync(BotStrings.YouHaveLeftTeam(player.Team.Name));
+                        await guildUser.SendMessageAsync(
+                            BotStrings.YouHaveLeftTeam(player.Team.Name), options: RequestOptionsSettings.Default);
                     }
                 });
         }
@@ -289,8 +289,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return user.Id == channel.Guild.OwnerId || user.GuildPermissions.Equals(GuildPermissions.All);
         }
 
-        private static bool TryGetEmojis(
-            BaseSocketClient client, int count, out IEmote[] emotes, out string errorMessage)
+        private static bool TryGetEmojis(int count, out IEmote[] emotes, out string errorMessage)
         {
             emotes = null;
             errorMessage = null;
@@ -334,7 +333,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             IUserMessage message, IEnumerable<IEmote> emotesForMessage, ITournamentState currentTournament)
         {
             currentTournament.AddJoinTeamMessageId(message.Id);
-            await message.AddReactionsAsync(emotesForMessage.ToArray());
+            await message.AddReactionsAsync(emotesForMessage.ToArray(), RequestOptionsSettings.Default);
         }
 
         private int GetMaximumTeamCount(IReadOnlyTournamentState currentTournament)
@@ -390,7 +389,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private async Task HandleAddReadersStage(ITournamentState currentTournament, IGuild guild, SocketMessage message)
         {
             IEnumerable<Task<IGuildUser>> getReaderMembers = message.MentionedUsers
-                .Select(user => guild.GetUserAsync(user.Id));
+                .Select(user => guild.GetUserAsync(user.Id, options: RequestOptionsSettings.Default));
             IGuildUser[] readerMembers = await Task.WhenAll(getReaderMembers);
             IEnumerable<Reader> readers = readerMembers.Select(member => new Reader()
             {
@@ -402,7 +401,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!currentTournament.Readers.Any())
             {
                 this.Logger.Debug("No readers specified, so staying in the AddReaders stage");
-                await message.Channel.SendMessageAsync(BotStrings.NoReadersAddedMinimumReaderCount);
+                await message.Channel.SendMessageAsync(
+                    BotStrings.NoReadersAddedMinimumReaderCount, options: RequestOptionsSettings.Default);
                 return;
             }
 
@@ -422,7 +422,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 this.Logger.Debug("Round robin count ({0}) specified is invalid", rounds);
                 await message.Channel.SendMessageAsync(
-                    BotStrings.InvalidNumberOfRoundRobins(TournamentState.MaxRoundRobins));
+                    BotStrings.InvalidNumberOfRoundRobins(TournamentState.MaxRoundRobins),
+                    options: RequestOptionsSettings.Default);
                 return;
             }
 
@@ -443,7 +444,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 if (!TeamNameParser.TryGetTeamNamesFromParts(
                     teamList, out IList<string> newTeamNames, out errorMessage))
                 {
-                    await message.Channel.SendMessageAsync(errorMessage);
+                    await message.Channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
                     this.Logger.Debug("Team names could not be parsed. Error message: {errorMessage}", errorMessage);
                     return;
                 }
@@ -461,7 +462,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             int teamsCount = currentTournament.Teams.Count();
             if (teamsCount < 2)
             {
-                await message.Channel.SendMessageAsync(BotStrings.MustBeTwoTeamsPerTournament);
+                await message.Channel.SendMessageAsync(
+                    BotStrings.MustBeTwoTeamsPerTournament, options: RequestOptionsSettings.Default);
                 currentTournament.RemoveTeams(teams);
                 this.Logger.Debug("Too few teams specified in AddTeams stage ({0})", teamsCount);
                 return;
@@ -471,16 +473,18 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (teamsCount > maxTeamsCount)
             {
                 currentTournament.TryClearTeams();
-                await message.Channel.SendMessageAsync(BotStrings.TooManyTeams(maxTeamsCount));
+                await message.Channel.SendMessageAsync(
+                    BotStrings.TooManyTeams(maxTeamsCount), options: RequestOptionsSettings.Default);
                 this.Logger.Debug("Too many teams specified in AddTeams stage ({0})", teamsCount);
                 return;
             }
 
-            if (!TryGetEmojis(this.Client, teamsCount, out IEmote[] emotes, out errorMessage))
+            if (!TryGetEmojis(teamsCount, out IEmote[] emotes, out errorMessage))
             {
                 // Something very strange has happened. Undo the addition and tell the user.
                 currentTournament.TryClearTeams();
-                await message.Channel.SendMessageAsync(BotStrings.UnexpectedErrorAddingTeams(errorMessage));
+                await message.Channel.SendMessageAsync(
+                    BotStrings.UnexpectedErrorAddingTeams(errorMessage), options: RequestOptionsSettings.Default);
                 this.Logger.Debug("Couldn't get emojis in AddTeams stage. Error message: {errorMessage}", errorMessage);
                 return;
             }
@@ -521,7 +525,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                 // We should generally avoid await inside of loops, but we want the messages and emojis to be
                 // in order.
-                IUserMessage newMessage = await message.Channel.SendMessageAsync(embed: embedBuilder.Build());
+                IUserMessage newMessage = await message.Channel.SendMessageAsync(
+                    embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
                 currentTournament.AddJoinTeamMessageId(newMessage.Id);
                 addReactionsTasks.Add(this.AddReactionsToMessage(newMessage, emotesForMessage, currentTournament));
             }
@@ -558,7 +563,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             EmbedBuilder addTeamsEmbedBuilder = new EmbedBuilder();
             addTeamsEmbedBuilder.Title = title;
             addTeamsEmbedBuilder.Description = instructions;
-            await channel.SendMessageAsync(embed: addTeamsEmbedBuilder.Build());
+            await channel.SendMessageAsync(
+                embed: addTeamsEmbedBuilder.Build(), options: RequestOptionsSettings.Default);
             this.Logger.Debug("Moved to stage {stage}", stage);
         }
 
