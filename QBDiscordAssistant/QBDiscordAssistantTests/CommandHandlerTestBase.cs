@@ -110,7 +110,7 @@ namespace QBDiscordAssistantTests
 
             List<IGuildChannel> messageChannels = new List<IGuildChannel>();
             mockGuild
-                .Setup(guild => guild.CreateTextChannelAsync(It.IsAny<string>(), It.IsAny<Action<TextChannelProperties>>(), null))
+                .Setup(guild => guild.CreateTextChannelAsync(It.IsAny<string>(), It.IsAny<Action<TextChannelProperties>>(), It.IsAny<RequestOptions>()))
                 .Returns<string, Action<TextChannelProperties>, RequestOptions>((name, func, options) =>
                 {
                     Dictionary<ulong, OverwritePermissions> textChannelPermissions = new Dictionary<ulong, OverwritePermissions>();
@@ -126,7 +126,7 @@ namespace QBDiscordAssistantTests
                         .Returns((ulong)messageChannels.Count);
                     mockTextChannel
                         .Setup(textChannel => textChannel.AddPermissionOverwriteAsync(
-                            It.IsAny<IRole>(), It.IsAny<OverwritePermissions>(), null))
+                            It.IsAny<IRole>(), It.IsAny<OverwritePermissions>(), It.IsAny<RequestOptions>()))
                         .Returns<IRole, OverwritePermissions, RequestOptions>((role, permissions, options2) =>
                         {
                             textChannelPermissions[role.Id] = permissions;
@@ -134,7 +134,7 @@ namespace QBDiscordAssistantTests
                         });
                     mockTextChannel
                         .Setup(textChannel => textChannel.AddPermissionOverwriteAsync(
-                            It.IsAny<IUser>(), It.IsAny<OverwritePermissions>(), null))
+                            It.IsAny<IUser>(), It.IsAny<OverwritePermissions>(), It.IsAny<RequestOptions>()))
                         .Returns<IUser, OverwritePermissions, RequestOptions>((user, permissions, options2) =>
                         {
                             textChannelPermissions[user.Id] = permissions;
@@ -171,20 +171,20 @@ namespace QBDiscordAssistantTests
                 });
 
             mockGuild
-                .Setup(guild => guild.GetChannelAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), null))
+                .Setup(guild => guild.GetChannelAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions>()))
                 .Returns<ulong, CacheMode, RequestOptions>((id, cacheMode, options) =>
                 {
                     return Task.FromResult(messageChannels[checked((int)id)]);
                 });
             mockGuild
-                .Setup(guild => guild.GetChannelsAsync(It.IsAny<CacheMode>(), null))
+                .Setup(guild => guild.GetChannelsAsync(It.IsAny<CacheMode>(), It.IsAny<RequestOptions>()))
                 .Returns<CacheMode, RequestOptions>((cacheMode, options) =>
                 {
                     IReadOnlyCollection<IGuildChannel> channels = ImmutableArray.Create(messageChannels.ToArray());
                     return Task.FromResult(channels);
                 });
             mockGuild
-                .Setup(guild => guild.CreateCategoryAsync(It.IsAny<string>(), null, null))
+                .Setup(guild => guild.CreateCategoryAsync(It.IsAny<string>(), null, It.IsAny<RequestOptions>()))
                 .Returns<string, Action<GuildChannelProperties>, RequestOptions>((name, func, options) =>
                 {
                     Mock<ICategoryChannel> mockCategoryChannel = new Mock<ICategoryChannel>();
@@ -198,7 +198,8 @@ namespace QBDiscordAssistantTests
                     return Task.FromResult(mockCategoryChannel.Object);
                 });
             mockGuild
-                .Setup(guild => guild.CreateVoiceChannelAsync(It.IsAny<string>(), It.IsAny<Action<VoiceChannelProperties>>(), null))
+                .Setup(guild => guild.CreateVoiceChannelAsync(
+                    It.IsAny<string>(), It.IsAny<Action<VoiceChannelProperties>>(), It.IsAny<RequestOptions>()))
                 .Returns<string, Action<VoiceChannelProperties>, RequestOptions>((name, func, options) =>
                 {
                     // TODO: Figure out how to run the func.
@@ -233,7 +234,12 @@ namespace QBDiscordAssistantTests
                         return CreateRole(id, name);
                     });
                 mockGuild
-                    .Setup(guild => guild.CreateRoleAsync(It.IsAny<string>(), It.IsAny<GuildPermissions?>(), It.IsAny<Color?>(), It.IsAny<bool>(), It.IsAny<RequestOptions>()))
+                    .Setup(guild => guild.CreateRoleAsync(
+                        It.IsAny<string>(), 
+                        It.IsAny<GuildPermissions?>(), 
+                        It.IsAny<Color?>(), 
+                        It.IsAny<bool>(), 
+                        It.IsAny<RequestOptions>()))
                     .Returns<string, GuildPermissions?, Color?, bool, RequestOptions>(
                         (name, permissions, color, isHoisted, options) =>
                         {
@@ -268,14 +274,14 @@ namespace QBDiscordAssistantTests
                     .AddRange(Enumerable.Range(0, roles.Count)
                     .Select(number => (ulong)number)));
             mockGuildUser
-                .Setup(user => user.RemoveRoleAsync(It.IsAny<IRole>(), null))
+                .Setup(user => user.RemoveRoleAsync(It.IsAny<IRole>(), It.IsAny<RequestOptions>()))
                 .Returns<IRole, RequestOptions>((role, options) =>
                 {
                     roles.Remove(role.Name);
                     return Task.CompletedTask;
                 });
             mockGuildUser
-                .Setup(user => user.AddRoleAsync(It.IsAny<IRole>(), null))
+                .Setup(user => user.AddRoleAsync(It.IsAny<IRole>(), It.IsAny<RequestOptions>()))
                 .Returns<IRole, RequestOptions>((role, options) =>
                 {
                     roles.Add(role.Name);
@@ -290,14 +296,14 @@ namespace QBDiscordAssistantTests
 
             Mock<IMessageChannel> mockChannel = new Mock<IMessageChannel>();
             mockChannel
-                .Setup(channel => channel.SendMessageAsync(It.IsAny<string>(), false, null, null))
+                .Setup(channel => channel.SendMessageAsync(It.IsAny<string>(), false, null, It.IsAny<RequestOptions>()))
                 .Returns<string, bool, Embed, RequestOptions>((message, isTTS, embed, options) =>
                 {
                     messageStore.ChannelMessages.Add(message);
                     return Task.FromResult(mockUserMessage.Object);
                 });
             mockChannel
-                .Setup(channel => channel.SendMessageAsync(null, false, It.IsAny<Embed>(), null))
+                .Setup(channel => channel.SendMessageAsync(null, false, It.IsAny<Embed>(), It.IsAny<RequestOptions>()))
                 .Returns<string, bool, Embed, RequestOptions>((message, isTTS, embed, options) =>
                 {
                     messageStore.ChannelEmbeds.Add(this.GetMockEmbedText(embed));
@@ -311,7 +317,8 @@ namespace QBDiscordAssistantTests
             Mock<IUserMessage> mockUserMessage = new Mock<IUserMessage>();
             Mock<IDMChannel> mockDmChannel = new Mock<IDMChannel>();
             mockDmChannel
-                .Setup(dmChannel => dmChannel.SendMessageAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<Embed>(), null))
+                .Setup(dmChannel => dmChannel.SendMessageAsync(
+                    It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<Embed>(), It.IsAny<RequestOptions>()))
                 .Returns<string, bool, Embed, RequestOptions>((message, isTTS, embed, options) =>
                 {
                     messageStore.DirectMessages.Add(message);

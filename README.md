@@ -44,12 +44,15 @@ Starting a tournament:
     !end
 
 TODO: Add unit testing for message handling. Unless we add wrapper classes for SocketMessage/BaseSocketClient/etc., this will have to wait until Discord.Net supports interfaces for these.
+
 TODO: Add persistence of tournaments, which requires using a database and making some changes to the basic classes (Reader, Team, etc.) to distinguish between database and Discord IDs. This would be a major change (v2)
+
 TODO: Track member name changes so we can update reader/player names.
+
 TODO: Have an option to allow for more automation, that would enable:
   - !win <team> in the channel would track who won that game, and would grant them permissions for the next room.
   - Tracking player buzzes. Either use a queue and clear on a score (0/10/15, etc.), or store a timestamp of the last buzz in the channel and mention the user if it's been long enough.
   - Longer term, potentially look at merging with the tournament runner and tracking all of the events.
   - This would be a major change (v3?)
+
 TODO: Look into integrating with the Google Sheets API so we can listen to OphirStats updates and have the bot update point totals/TU numbers when the stats are updated.
-  

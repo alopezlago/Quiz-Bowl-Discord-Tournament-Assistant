@@ -12,9 +12,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     public class Bot : IDisposable
     {
-        private readonly IServiceCollection _map = new ServiceCollection();
-        private readonly CommandService _commands = new CommandService();
-
         public Bot(BotConfiguration configuration)
         {
             DiscordSocketConfig clientConfig = new DiscordSocketConfig()

@@ -48,6 +48,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             sendMessages: PermValue.Allow,
             readMessageHistory: PermValue.Allow);
 
+        private static readonly RequestOptions RequestOptions = new RequestOptions()
+        {
+            RetryMode = RetryMode.RetryRatelimit
+        };
+
         public BotCommandHandler(ICommandContext context, GlobalTournamentsManager globalManager)
         {
             this.Context = context;
@@ -313,7 +318,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (channel != null)
             {
                 this.Logger.Debug("Finals started successfully");
-                await this.Context.Channel.SendMessageAsync(BotStrings.FinalsParticipantsPleaseJoin(channel.Mention));
+                await this.Context.Channel.SendMessageAsync(
+                    BotStrings.FinalsParticipantsPleaseJoin(channel.Mention),
+                    options: RequestOptions);
             }
         }
 
@@ -399,7 +406,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     oldDirector.Id, 
                     tournamentName);
                 await dmChannel.SendMessageAsync(
-                    BotStrings.TournamentDoesNotExist(tournamentName, this.Context.Guild.Name));
+                    BotStrings.TournamentDoesNotExist(tournamentName, this.Context.Guild.Name),
+                    options: RequestOptions);
                 return;
             }
 
@@ -408,7 +416,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 this.Logger.Debug(
                     "Removed {id} as a tournament director for {tournamentName}", oldDirector.Id, tournamentName);
                 await dmChannel.SendMessageAsync(
-                    BotStrings.RemovedTournamentDirector(tournamentName, this.Context.Guild.Name));
+                    BotStrings.RemovedTournamentDirector(tournamentName, this.Context.Guild.Name),
+                    options: RequestOptions);
                 return;
             }
 
@@ -417,7 +426,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 oldDirector.Id, 
                 tournamentName);
             await dmChannel.SendMessageAsync(
-                BotStrings.UserNotTournamentDirector(tournamentName, this.Context.Guild.Name));
+                BotStrings.UserNotTournamentDirector(tournamentName, this.Context.Guild.Name), options: RequestOptions);
         }
 
         public Task Setup(string tournamentName)
@@ -471,7 +480,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             new HashSet<Reader>(currentTournament.Readers));
 
                         this.Logger.Debug("Tournament generated. Creating channels and roles");
-                        await this.Context.Channel.SendMessageAsync(BotStrings.CreatingChannelsAndRoles);
+                        await this.Context.Channel.SendMessageAsync(
+                            BotStrings.CreatingChannelsAndRoles, options: RequestOptions);
                         await this.CreateArtifacts(currentTournament);
 
                         await UpdateStage(currentTournament, TournamentStage.RunningPrelims);
@@ -490,8 +500,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (startSucceeded)
             {
-                await this.Context.Channel.SendMessageAsync(BotStrings.TournamentHasStarted(
-                    MentionUtils.MentionChannel(this.Context.Channel.Id)));
+                await this.Context.Channel.SendMessageAsync(
+                    BotStrings.TournamentHasStarted(
+                        MentionUtils.MentionChannel(this.Context.Channel.Id)),
+                    options: RequestOptions);
             }
         }
 
@@ -557,8 +569,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             List<Task> roleChangeTasks = new List<Task>();
-            roleChangeTasks.Add(newReaderUser.AddRoleAsync(oldReaderRole));
-            roleChangeTasks.Add(oldReaderUser.RemoveRoleAsync(oldReaderRole));
+            roleChangeTasks.Add(newReaderUser.AddRoleAsync(oldReaderRole, RequestOptions));
+            roleChangeTasks.Add(oldReaderUser.RemoveRoleAsync(oldReaderRole, RequestOptions));
             await Task.WhenAll(roleChangeTasks);
             await this.SendUserMessage(BotStrings.ReadersSwitchedSuccessfully);
         }
@@ -621,7 +633,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     continue;
                 }
 
-                assignPlayerRoleTasks.Add(user.AddRoleAsync(role));
+                assignPlayerRoleTasks.Add(user.AddRoleAsync(role, RequestOptions));
             }
 
             await Task.WhenAll(assignPlayerRoleTasks);
@@ -639,7 +651,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 if (users.TryGetValue(directorId, out IGuildUser user))
                 {
-                    assignRoleTasks.Add(user.AddRoleAsync(role));
+                    assignRoleTasks.Add(user.AddRoleAsync(role, RequestOptions));
                 }
                 else
                 {
@@ -673,8 +685,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private async Task<IRole> AssignRoomReaderRole(string roleName, ulong readerId, IDictionary<ulong, IGuildUser> members)
         {
             IRole role = await this.Context.Guild.CreateRoleAsync(
-                roleName, permissions: PrivilegedGuildPermissions, color: Color.Green);
-            await members[readerId].AddRoleAsync(role);
+                roleName, permissions: PrivilegedGuildPermissions, color: Color.Green, options: RequestOptions);
+            await members[readerId].AddRoleAsync(role, options: RequestOptions);
             return role;
         }
 
@@ -690,7 +702,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 // TODO: This command isn't enforced on the main channel.
                 if (channel != this.Context.Channel)
                 {
-                    deleteChannelTasks.Add(channel.DeleteAsync());
+                    deleteChannelTasks.Add(channel.DeleteAsync(RequestOptions));
                 }
             }
 
@@ -703,7 +715,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     roleName.StartsWith(ReaderRoomRolePrefix) ||
                     roleName.StartsWith(TeamRolePrefix))
                 {
-                    deleteRoleTasks.Add(role.DeleteAsync());
+                    deleteRoleTasks.Add(role.DeleteAsync(RequestOptions));
                 }
             }
 
@@ -723,8 +735,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (state.ChannelIds != null)
             {
                 IGuildChannel[] channels = await Task.WhenAll(state.ChannelIds
-                    .Select(id => this.Context.Guild.GetChannelAsync(id)));
-                deleteChannelTasks = channels.Select(channel => channel.DeleteAsync());
+                    .Select(id => this.Context.Guild.GetChannelAsync(id, options: RequestOptions)));
+                deleteChannelTasks = channels
+                    .Where(channel => channel != null)
+                    .Select(channel => channel.DeleteAsync(options: RequestOptions));
             }
             else
             {
@@ -737,7 +751,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             IEnumerable<Task> deleteRoleTasks = roleIds?
                 .Select(id => this.Context.Guild.GetRole(id))
                 .Where(role => role != null)
-                .Select(role => role.DeleteAsync());
+                .Select(role => role.DeleteAsync(RequestOptions));
             if (deleteRoleTasks == null)
             {
                 deleteRoleTasks = new Task[0];
@@ -778,7 +792,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             Debug.Assert(firstRound.Games.Select(game => game.Reader.Name).Count() ==
                 firstRound.Games.Select(game => game.Reader.Name).Distinct().Count(),
                 "All reader names should be unique.");
-            ICategoryChannel voiceCategoryChannel = await this.Context.Guild.CreateCategoryAsync("Readers");
+            ICategoryChannel voiceCategoryChannel = await this.Context.Guild.CreateCategoryAsync(
+                "Readers", options: RequestOptions);
             foreach (Game game in firstRound.Games)
             {
                 createVoiceChannelsTasks.Add(this.CreateVoiceChannel(voiceCategoryChannel, roles, game.Reader));
@@ -794,7 +809,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 int roomNumber = 0;
                 ICategoryChannel roundCategoryChannel = await this.Context.Guild.CreateCategoryAsync(
-                    $"Round {roundNumber}");
+                    $"Round {roundNumber}",
+                    options: RequestOptions);
                 textCategoryChannelIds.Add(roundCategoryChannel.Id);
 
                 foreach (Game game in round.Games)
@@ -817,7 +833,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private async Task<KeyValuePair<Team, IRole>> CreateTeamRole(Team team)
         {
-            IRole role = await this.Context.Guild.CreateRoleAsync(GetTeamRoleName(team), color: Color.Teal);
+            IRole role = await this.Context.Guild.CreateRoleAsync(
+                GetTeamRoleName(team), color: Color.Teal, options: RequestOptions);
             return new KeyValuePair<Team, IRole>(team, role);
         }
 
@@ -832,16 +849,21 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 channelProps =>
                 {
                     channelProps.CategoryId = parent.Id;
-                });
+                },
+                RequestOptions);
             this.Logger.Debug("Text channel for room {0} in round {1} created", roomNumber, roundNumber);
 
             this.Logger.Debug("Adding permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
-            await channel.AddPermissionOverwriteAsync(this.Context.Guild.EveryoneRole, EveryonePermissions);
+            await channel.AddPermissionOverwriteAsync(
+                this.Context.Guild.EveryoneRole, EveryonePermissions, RequestOptions);
 
             // TODO: Give the bot less-than-privileged permissions.
-            await channel.AddPermissionOverwriteAsync(this.Context.Client.CurrentUser, PrivilegedOverwritePermissions);
-            await channel.AddPermissionOverwriteAsync(roles.DirectorRole, PrivilegedOverwritePermissions);
-            await channel.AddPermissionOverwriteAsync(roles.RoomReaderRoles[roomNumber], PrivilegedOverwritePermissions);
+            await channel.AddPermissionOverwriteAsync(
+                this.Context.Client.CurrentUser, PrivilegedOverwritePermissions, RequestOptions);
+            await channel.AddPermissionOverwriteAsync(
+                roles.DirectorRole, PrivilegedOverwritePermissions, RequestOptions);
+            await channel.AddPermissionOverwriteAsync(
+                roles.RoomReaderRoles[roomNumber], PrivilegedOverwritePermissions, RequestOptions);
 
             List<Task> addTeamRolesToChannel = new List<Task>();
             foreach (Team team in game.Teams)
@@ -852,7 +874,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     continue;
                 }
 
-                addTeamRolesToChannel.Add(channel.AddPermissionOverwriteAsync(role, TeamPermissions));
+                addTeamRolesToChannel.Add(channel.AddPermissionOverwriteAsync(role, TeamPermissions, RequestOptions));
             }
 
             await Task.WhenAll(addTeamRolesToChannel);
@@ -865,13 +887,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Debug("Creating voice channel for reader {id}", reader.Id);
             string name = GetVoiceRoomName(reader);
-            // TODO: Verify this creates the channel under the category
             IVoiceChannel channel = await this.Context.Guild.CreateVoiceChannelAsync(
                 name,
                 channelProps =>
                 {
                     channelProps.CategoryId = parent.Id;
-                });
+                },
+                RequestOptions);
             this.Logger.Debug("Voice channel for reader {id} created", reader.Id);
             return channel;
         }
@@ -899,7 +921,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private async Task SendUserMessage(string errorMessage)
         {
             IDMChannel channel = await this.Context.User.GetOrCreateDMChannelAsync();
-            await channel.SendMessageAsync(errorMessage);
+            await channel.SendMessageAsync(errorMessage, options: RequestOptions);
         }
 
         private async Task UpdateStage(ITournamentState state, TournamentStage stage)
@@ -913,7 +935,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             EmbedBuilder embedBuilder = new EmbedBuilder();
             embedBuilder.Title = title;
             embedBuilder.Description = instructions;
-            await this.Context.Channel.SendMessageAsync(embed: embedBuilder.Build());
+            await this.Context.Channel.SendMessageAsync(embed: embedBuilder.Build(), options: RequestOptions);
             this.Logger.Debug("Moved to stage {stage}", stage);
         }
 

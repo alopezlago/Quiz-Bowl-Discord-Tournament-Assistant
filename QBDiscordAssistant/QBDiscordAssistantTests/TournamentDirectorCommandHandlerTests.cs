@@ -183,7 +183,7 @@ namespace QBDiscordAssistantTests
             HashSet<ulong> removedChannelIds = new HashSet<ulong>();
             HashSet<ulong> removedRoleIds = new HashSet<ulong>();
             mockGuild
-                .Setup(guild => guild.GetChannelAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), null))
+                .Setup(guild => guild.GetChannelAsync(It.IsAny<ulong>(), It.IsAny<CacheMode>(), It.IsAny<RequestOptions>()))
                 .Returns<ulong, CacheMode, RequestOptions>((id, cacheMode, options) =>
                 {
                     Mock<IGuildChannel> mockChannel = new Mock<IGuildChannel>();
