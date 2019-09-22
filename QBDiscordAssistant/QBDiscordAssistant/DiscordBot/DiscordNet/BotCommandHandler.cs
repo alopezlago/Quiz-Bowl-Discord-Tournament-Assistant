@@ -598,6 +598,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"{reader.Name.Replace(" ", "_")}'s_Voice_Channel";
         }
 
+        private async Task AddPermission(IGuildChannel channel, IRole role)
+        {
+            this.Logger.Debug("Adding role {0} to channel {1}", role.Id, channel.Id);
+            await channel.AddPermissionOverwriteAsync(role, TeamPermissions, RequestOptionsSettings.Default);
+            this.Logger.Debug("Added role {0} to channel {1}", role.Id, channel.Id);
+        }
+
         private async Task<Dictionary<Team, IRole>> AssignPlayerRoles(
             ITournamentState state, IDictionary<ulong, IGuildUser> users)
         {
@@ -690,7 +697,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             // Simplest way is to delete all channels that are not a main channel
             List<Task> deleteChannelTasks = new List<Task>();
-            IReadOnlyCollection<IGuildChannel> channels = await this.Context.Guild.GetChannelsAsync();
+            IReadOnlyCollection<IGuildChannel> channels = await this.Context.Guild.GetChannelsAsync(
+                options: RequestOptionsSettings.Default);
             foreach (IGuildChannel channel in channels)
             {
                 // This should only be accepted on the main channel.
@@ -740,6 +748,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 deleteChannelTasks = new Task[0];
             }
 
+            // To prevent spamming Discord too much, delete all the channels, then delete the roles
+            this.Logger.Debug("Deleting all channels created by the tournament {name}", state.Name);
+            await Task.WhenAll(deleteChannelTasks);
+            this.Logger.Debug("All channels created by the tournament {name} are deleted", state.Name);
+
             IEnumerable<ulong> roleIds = state.TournamentRoles?.ReaderRoomRoleIds
                 .Concat(state.TournamentRoles.TeamRoleIds.Select(kvp => kvp.Value))
                 .Concat(new ulong[] { state.TournamentRoles.DirectorRoleId });
@@ -752,9 +765,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 deleteRoleTasks = new Task[0];
             }
 
-            this.Logger.Debug("Deleting all channels and roles created by the tournament {name}", state.Name);
-            await Task.WhenAll(deleteChannelTasks.Concat(deleteRoleTasks));
-            this.Logger.Debug("All channels and roles created by the tournament {name} are deleted", state.Name);
+            this.Logger.Debug("Deleting all roles created by the tournament {name}", state.Name);
+            await Task.WhenAll(deleteRoleTasks);
+            this.Logger.Debug("All roles created by the tournament {name} are deleted", state.Name);
             await UpdateStage(state, TournamentStage.Complete);
         }
 
@@ -798,6 +811,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             // Create the text channels
             List<Task<ITextChannel>> createTextChannelsTasks = new List<Task<ITextChannel>>();
+            List<Func<Task<ITextChannel>>> createTextChannelTasks2 = new List<Func<Task<ITextChannel>>>();
             List<ulong> textCategoryChannelIds = new List<ulong>();
             int roundNumber = 1;
             foreach (Round round in state.Schedule.Rounds)
@@ -817,7 +831,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                 roundNumber++;
             }
-
+            
             ITextChannel[] textChannels = await Task.WhenAll(createTextChannelsTasks);
             state.ChannelIds = voiceChannels.Select(channel => channel.Id)
                 .Concat(textChannels.Select(channel => channel.Id))
@@ -869,7 +883,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     continue;
                 }
 
-                addTeamRolesToChannel.Add(channel.AddPermissionOverwriteAsync(role, TeamPermissions, RequestOptionsSettings.Default));
+                // TODO: Investigate if it's possible to parallelize this. Other attempts to do so (Task.WhenAll,
+                // AsyncEnumerable's ParallelForEachAsync) have had bugs where roles sometimes aren't assigned to a
+                // channel. Adding an await in the loop seems to be the only thing that 
+                await this.AddPermission(channel, role);
             }
 
             await Task.WhenAll(addTeamRolesToChannel);

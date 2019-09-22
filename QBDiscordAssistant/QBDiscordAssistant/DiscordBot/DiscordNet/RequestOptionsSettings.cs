@@ -6,7 +6,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
     {
         public static RequestOptions Default => new RequestOptions()
         {
-            RetryMode = RetryMode.RetryRatelimit
+            RetryMode = RetryMode.AlwaysRetry
         };
     }
 }
