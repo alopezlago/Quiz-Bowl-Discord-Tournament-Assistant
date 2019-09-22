@@ -7,7 +7,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     internal static class TournamentsManagerExtensions
     {
-        public static async Task DoReadActionOnCurrentTournamentForMember(
+        public static async Task DoReadActionOnCurrentTournamentForMemberAsync(
             this TournamentsManager manager, IUser user, Func<IReadOnlyTournamentState, Task> action)
         {
             Result<Task> result = manager.TryReadActionOnCurrentTournament(action);
@@ -21,7 +21,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await channel.SendMessageAsync(BotStrings.UnableToPerformCommand(result.ErrorMessage));
         }
 
-        public static async Task DoReadWriteActionOnCurrentTournamentForMember(
+        public static async Task DoReadWriteActionOnCurrentTournamentForMemberAsync(
             this TournamentsManager manager, IUser user, Func<ITournamentState, Task> action)
         {
             Result<Task> result = manager.TryReadWriteActionOnCurrentTournament(action);

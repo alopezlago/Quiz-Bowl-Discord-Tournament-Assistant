@@ -24,7 +24,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} adding TD {1} for {2}", this.Context.User.Id, newDirector.Id, tournamentName);
-            return this.HandleCommand(commandHandler => commandHandler.AddTournamentDirector(newDirector, tournamentName));
+            return this.HandleCommandAsync(commandHandler => commandHandler.AddTournamentDirectorAsync(newDirector, tournamentName));
         }
 
         // TODO: Allow other TDs to do this
@@ -36,7 +36,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} removing TD {1} for {2}", this.Context.User.Id, oldDirector.Id, tournamentName);
-            return this.HandleCommand(commandHandler => commandHandler.RemoveTournamentDirector(
+            return this.HandleCommandAsync(commandHandler => commandHandler.RemoveTournamentDirectorAsync(
                 oldDirector, tournamentName));
         }
 
@@ -46,7 +46,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} clearing everything in channel {1}", this.Context.User.Id, this.Context.Channel.Id);
-            return this.HandleCommand(commandHandler => commandHandler.ClearAll());
+            return this.HandleCommandAsync(commandHandler => commandHandler.ClearAllAsync());
         }
     }
 }

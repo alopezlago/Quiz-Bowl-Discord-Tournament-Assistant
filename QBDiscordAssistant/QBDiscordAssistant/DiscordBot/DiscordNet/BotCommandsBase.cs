@@ -18,7 +18,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         protected ILogger Logger { get; }
 
-        protected Task HandleCommand(Func<BotCommandHandler, Task> handleCommandFunction)
+        protected Task HandleCommandAsync(Func<BotCommandHandler, Task> handleCommandFunction)
         {
             // Discord.Net complains if a task takes too long while handling the command. Unfortunately, the current
             // tournament lock may block certain commands, and other commands are just long-running (like !start).

@@ -58,7 +58,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public async Task ConnectAsync()
         {
             string token = this.Configuration.BotToken;
-            this.Client.Log += this.LogMessage;
+            this.Client.Log += this.LogMessageAsync;
 
             // TODO: move this code to BotEventHandler. This does require rewriting a fair amount of the event handlers,
             // since we need to use a socket client in it.
@@ -77,7 +77,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             if (this.Client != null)
             {
-                this.Client.Log -= this.LogMessage;
+                this.Client.Log -= this.LogMessageAsync;
                 this.Client.MessageReceived -= this.OnMessageReceived;
                 this.Client.Dispose();
                 this.Client = null;
@@ -106,7 +106,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
         }
 
-        private Task LogMessage(LogMessage message)
+        private Task LogMessageAsync(LogMessage message)
         {
             LogEventLevel logLevel = ConvertLogLevels(message.Severity);
             this.Logger.Write(logLevel, "Discord.Net message: {0}", message.Message);

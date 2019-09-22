@@ -101,7 +101,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            await manager.DoReadWriteActionOnCurrentTournamentForMember(
+            await manager.DoReadWriteActionOnCurrentTournamentForMemberAsync(
                 guildUser,
                 async currentTournament =>
                 {
@@ -224,7 +224,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             // we're removing from the set has the same team as the emoji maps to.
             // TODO: We may want to make this a dictionary of IDs to Players to make this operation efficient. We could
             // use ContainsKey to do the contains checks efficiently.
-            await this.GetTournamentsManager(guildChannel.Guild).DoReadWriteActionOnCurrentTournamentForMember(
+            await this.GetTournamentsManager(guildChannel.Guild).DoReadWriteActionOnCurrentTournamentForMemberAsync(
                 guildUser,
                 async currentTournament =>
                 {

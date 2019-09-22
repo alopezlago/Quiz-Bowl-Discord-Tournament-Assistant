@@ -15,7 +15,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public Task GetCurrentTournament()
         {
             this.Logger.Information("{0} asking for current tournament", this.Context.User.Id);
-            return this.HandleCommand(commandHandler => commandHandler.GetCurrentTournament());
+            return this.HandleCommandAsync(commandHandler => commandHandler.GetCurrentTournamentAsync());
         }
     }
 }

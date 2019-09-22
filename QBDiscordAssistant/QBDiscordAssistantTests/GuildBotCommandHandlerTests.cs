@@ -21,7 +21,7 @@ namespace QBDiscordAssistantTests
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
-            await commandHandler.GetCurrentTournament();
+            await commandHandler.GetCurrentTournamentAsync();
             string expectedMessage = BotStrings.UnableToPerformCommand(TournamentStrings.NoCurrentTournamentRunning);
             messageStore.VerifyDirectMessages(expectedMessage);
         }
@@ -35,7 +35,7 @@ namespace QBDiscordAssistantTests
             this.AddCurrentTournament(globalManager);
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
-            await commandHandler.GetCurrentTournament();
+            await commandHandler.GetCurrentTournamentAsync();
             string expectedMessage = BotStrings.CurrentTournamentInGuild(DefaultGuildName, DefaultTournamentName);
             messageStore.VerifyDirectMessages(expectedMessage);
         }

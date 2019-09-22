@@ -20,7 +20,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{id} is attempting to set up {tournamentName}", this.Context.User.Id, tournamentName);
-            return this.HandleCommand(commandHandler => commandHandler.Setup(tournamentName));
+            return this.HandleCommandAsync(commandHandler => commandHandler.SetupTournamentAsync(tournamentName));
         }
 
         // TODO: Make this add the reaction to the join message, if possible.
@@ -32,7 +32,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} is adding the user {1} to the team {2}", this.Context.User.Id, user.Id, teamName);
-            return this.HandleCommand(commandHandler => commandHandler.AddPlayer(user, teamName));
+            return this.HandleCommandAsync(commandHandler => commandHandler.AddPlayerAsync(user, teamName));
         }
 
         // TODO: Make this remove the reaction from the join message, if possible.
@@ -43,7 +43,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} is removing the user {1} from their team", this.Context.User.Id, user.Id);
-            return this.HandleCommand(commandHandler => commandHandler.RemovePlayer(user));
+            return this.HandleCommandAsync(commandHandler => commandHandler.RemovePlayerAsync(user));
         }
 
         [Command("getPlayers")]
@@ -51,7 +51,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public Task GetPlayers()
         {
             this.Logger.Information("{id} is requesting all of the current players", this.Context.User.Id);
-            return this.HandleCommand(commandHandler => commandHandler.GetPlayers());
+            return this.HandleCommandAsync(commandHandler => commandHandler.GetPlayersAsync());
         }
 
         [Command("start")]
@@ -59,7 +59,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public Task Start()
         {
             this.Logger.Information("{id} is starting the current tournament", this.Context.User.Id);
-            return this.HandleCommand(commandHandler => commandHandler.Start());
+            return this.HandleCommandAsync(commandHandler => commandHandler.StartAsync());
         }
 
         [Command("back")]
@@ -67,7 +67,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public Task Back()
         {
             this.Logger.Information("{id} is undoing their previous setup action", this.Context.User.Id);
-            return this.HandleCommand(commandHandler => commandHandler.Back());
+            return this.HandleCommandAsync(commandHandler => commandHandler.GoBackAsync());
         }
 
         [Command("switchreaders")]
@@ -78,7 +78,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} is replacing reader {1} with reader {2}", this.Context.User.Id, oldReaderUser.Id, newReaderUser.Id);
-            return this.HandleCommand(commandHandler => commandHandler.SwitchReader(oldReaderUser, newReaderUser));
+            return this.HandleCommandAsync(commandHandler => commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser));
         }
 
         [Command("finals")]
@@ -92,7 +92,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 this.Context.User.Id, 
                 readerUser.Id, 
                 rawTeamNameParts);
-            return this.HandleCommand(commandHandler => commandHandler.Finals(readerUser, rawTeamNameParts));
+            return this.HandleCommandAsync(commandHandler => commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts));
         }
 
         [Command("end")]
@@ -100,7 +100,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public Task End()
         {
             this.Logger.Information("{0} is ending the tournament", this.Context.User.Id);
-            return this.HandleCommand(commandHandler => commandHandler.End());
+            return this.HandleCommandAsync(commandHandler => commandHandler.EndTournamentAsync());
         }
     }
 }
