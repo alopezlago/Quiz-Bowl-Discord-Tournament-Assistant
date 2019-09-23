@@ -63,33 +63,74 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private ILogger Logger { get; }
 
-        public Task AddPlayerAsync(IGuildUser user, string teamName)
+        public async Task AddPlayerAsync(IGuildUser user, string teamName)
         {
-            return this.DoReadWriteActionOnCurrentTournamentAsync(
+            bool addPlayerSuccessful = false;
+            ulong teamRoleId = default(ulong);
+            await this.DoReadWriteActionOnCurrentTournamentAsync(
                 currentTournament =>
                 {
-                    if (currentTournament.TryGetTeamFromName(teamName, out Team team))
+                    // Rewrite exit-early, then choose whether we add the role or not
+                    if (!currentTournament.TryGetTeamFromName(teamName, out Team team))
                     {
-                        Player player = new Player()
-                        {
-                            Id = user.Id,
-                            Team = team
-                        };
-                        if (currentTournament.TryAddPlayer(player))
-                        {
-                            this.Logger.Debug("Player {id} successfully added to team {teamName}", user.Id, teamName);
-                            return this.SendUserMessageAsync(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
-                        }
-                        else
-                        {
-                            this.Logger.Debug("Player {id} already on team; not added to {teamName}", user.Id, teamName);
-                            return this.SendUserMessageAsync(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
-                        }
+                        this.Logger.Debug("Player {id} could not be added to nonexistent {teamName}", user.Id, teamName);
+                        return this.SendUserMessageAsync(BotStrings.TeamDoesNotExist(teamName));
                     }
 
-                    this.Logger.Debug("Player {id} could not be added to nonexistent {teamName}", user.Id, teamName);
-                    return this.SendUserMessageAsync(BotStrings.TeamDoesNotExist(teamName));
+                    Player player = new Player()
+                    {
+                        Id = user.Id,
+                        Team = team
+                    };
+                    if (!currentTournament.TryAddPlayer(player))
+                    {
+                        this.Logger.Debug("Player {id} already on team; not added to {teamName}", user.Id, teamName);
+                        return this.SendUserMessageAsync(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
+                    }
+
+                    if (!currentTournament.IsTorunamentInPlayStage())
+                    {
+                        addPlayerSuccessful = true;
+                        return Task.CompletedTask;
+                    }
+
+                    KeyValuePair<Team, ulong> teamRoleIdPair = currentTournament.TournamentRoles.TeamRoleIds
+                        .FirstOrDefault(kvp => kvp.Key == team);
+                    if (teamRoleIdPair.Key != team)
+                    {
+                        // We can't add the role to the player. So undo adding the player to the tournament
+                        this.Logger.Debug(
+                            "Player {id} could not be added because role for {teamName} does not exist",
+                            user.Id,
+                            teamName);
+                        currentTournament.TryRemovePlayer(player.Id);
+                        return this.SendUserMessageAsync(
+                            BotStrings.PlayerCannotBeAddedToTeamWithNoRole(user.Mention, teamName));
+                    }
+
+                    teamRoleId = teamRoleIdPair.Value;
+                    addPlayerSuccessful = true;
+                    return Task.CompletedTask;
                 });
+
+            if (!addPlayerSuccessful)
+            {
+                return;
+            }
+
+            IRole teamRole = null;
+            if (teamRoleId != default(ulong))
+            {
+                teamRole = this.Context.Guild.GetRole(teamRoleId);
+                await user.AddRoleAsync(teamRole, RequestOptionsSettings.Default);
+            }
+
+            this.Logger.Debug(
+                "Player {0} successfully added to team {1}. Role added: {2}",
+                user.Id,
+                teamName,
+                teamRole != null);
+            await this.SendUserMessageAsync(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
         }
 
         public Task AddTournamentDirectorAsync(IGuildUser newDirector, string tournamentName)
@@ -364,20 +405,47 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             this.Logger.Debug("Current players returned successfully");
         }
 
-        public Task RemovePlayerAsync(IGuildUser user)
+        public async Task RemovePlayerAsync(IGuildUser user)
         {
-            return this.DoReadWriteActionOnCurrentTournamentAsync(
+            bool removedSuccessfully = false;
+            IEnumerable<ulong> teamRoleIds = null;
+            await this.DoReadWriteActionOnCurrentTournamentAsync(
                 currentTournament =>
                 {
-                    if (currentTournament.TryRemovePlayer(user.Id))
+                    if (!currentTournament.TryRemovePlayer(user.Id))
                     {
-                        this.Logger.Debug("Player {id} was removed from the tournament", user.Id);
-                        return this.SendUserMessageAsync(BotStrings.PlayerRemoved(user.Mention));
+                        this.Logger.Debug("Player {id} wasn't on any team", user.Id);
+                        return this.SendUserMessageAsync(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
                     }
 
-                    this.Logger.Debug("Player {id} wasn't on any team", user.Id);
-                    return this.SendUserMessageAsync(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
+                    if (currentTournament.IsTorunamentInPlayStage())
+                    {
+                        teamRoleIds = currentTournament.TournamentRoles.TeamRoleIds.Select(kvp => kvp.Value);
+                    }
+
+                    removedSuccessfully = true;
+                    return Task.CompletedTask;
                 });
+
+            if (!removedSuccessfully)
+            {
+                return;
+            }
+
+            // Get the team role from the player and remove it.
+            if (teamRoleIds != null)
+            {
+                IEnumerable<IRole> teamRoles = user.RoleIds.Join(
+                    teamRoleIds,
+                    id => id,
+                    id => id,
+                    (userRoleId, teamId) => this.Context.Guild.GetRole(userRoleId));
+                await user.RemoveRolesAsync(teamRoles, RequestOptionsSettings.Default);
+            }
+
+            this.Logger.Debug(
+                "Player {0} was removed from the tournament. Role removed: {2}", user.Id, teamRoleIds != null);
+            await this.SendUserMessageAsync(BotStrings.PlayerRemoved(user.Mention));
         }
 
         public async Task RemoveTournamentDirectorAsync(IGuildUser oldDirector, string tournamentName)
@@ -505,25 +573,23 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public async Task SwitchReaderAsync(IGuildUser oldReaderUser, IGuildUser newReaderUser)
         {
             bool switchSuccessful = false;
-            IRole oldReaderRole = null;
+            ////IRole oldReaderRole = null;
+            ulong oldReaderRoleId = 0;
             await DoReadWriteActionOnCurrentTournamentAsync(
                 async currentTournament =>
                 {
                     // Only allow this after the tournament has started running
-                    if (currentTournament.Stage != TournamentStage.RunningPrelims &&
-                        currentTournament.Stage != TournamentStage.Finals)
+                    if (!currentTournament.IsTorunamentInPlayStage())
                     {
 
                         await this.SendUserMessageAsync(BotStrings.CommandOnlyUsedWhileTournamentRunning);
                         return;
                     }
 
-                    // This will act unexpectedly if the user has more than one reader role.
-                    oldReaderRole = this.Context.Guild.Roles
-                        .Where(role => role.Name.StartsWith(ReaderRoomRolePrefix))
-                        .Join(oldReaderUser.RoleIds, role => role.Id, id => id, (role, id) => role)
+                    oldReaderRoleId = currentTournament.TournamentRoles.ReaderRoomRoleIds
+                        .Join(oldReaderUser.RoleIds, id => id, id => id, (roomRoleId, readerRoleId) => roomRoleId)
                         .FirstOrDefault();
-                    if (oldReaderRole == null)
+                    if (oldReaderRoleId == default(ulong))
                     {
                         await this.SendUserMessageAsync(BotStrings.CouldntGetRoleForTheOldReader);
                         return;
@@ -562,6 +628,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 return;
             }
+
+            IRole oldReaderRole = this.Context.Guild.GetRole(oldReaderRoleId);
 
             List<Task> roleChangeTasks = new List<Task>();
             roleChangeTasks.Add(newReaderUser.AddRoleAsync(oldReaderRole, RequestOptionsSettings.Default));

@@ -90,6 +90,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"{name} is not a current reader. You can only replace existing readers.";
         }
 
+        public static string PlayerCannotBeAddedToTeamWithNoRole(string playerName, string teamName)
+        {
+            return $"Player '{playerName}' can not be added to team '{teamName}' because the team has no role.";
+        }
+
         public static string PlayerIsAlreadyOnTeam(string name)
         {
             return $"Player '{name}' is already on a team.";

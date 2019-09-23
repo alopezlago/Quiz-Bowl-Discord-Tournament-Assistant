@@ -219,7 +219,7 @@ namespace QBDiscordAssistantTests
                 ImmutableList<IRole> roles = ImmutableList<IRole>.Empty;
                 for (int i = 0; i < roleNames.Count; i++)
                 {
-                    roles = roles.Add(CreateRole((ulong)i, roleNames[i]));
+                    roles = roles.Add(CreateRole((ulong)(i + 1), roleNames[i]));
                 }
 
                 mockGuild
@@ -229,7 +229,7 @@ namespace QBDiscordAssistantTests
                     .Setup(guild => guild.GetRole(It.IsAny<ulong>()))
                     .Returns<ulong>(id =>
                     {
-                        int intId = checked((int)id);
+                        int intId = checked((int)(id - 1));
                         string name = roleNames[intId];
                         return CreateRole(id, name);
                     });
@@ -258,6 +258,13 @@ namespace QBDiscordAssistantTests
 
         protected IGuildUser CreateGuildUser(ulong userId, List<string> roles = null)
         {
+            if (roles == null)
+            {
+                roles = new List<string>();
+            }
+
+            List<ulong> roleIds = new List<ulong>(Enumerable.Range(1, roles.Count).Select(number => (ulong)number));
+
             Mock<IGuildUser> mockGuildUser = new Mock<IGuildUser>();
             mockGuildUser
                 .Setup(user => user.Id)
@@ -270,14 +277,27 @@ namespace QBDiscordAssistantTests
                 .Returns($"@User{userId}");
             mockGuildUser
                 .Setup(user => user.RoleIds)
-                .Returns(() => ImmutableList<ulong>.Empty
-                    .AddRange(Enumerable.Range(0, roles.Count)
-                    .Select(number => (ulong)number)));
+                .Returns(() => roleIds);
             mockGuildUser
                 .Setup(user => user.RemoveRoleAsync(It.IsAny<IRole>(), It.IsAny<RequestOptions>()))
                 .Returns<IRole, RequestOptions>((role, options) =>
                 {
                     roles.Remove(role.Name);
+                    roleIds.Remove(role.Id);
+                    return Task.CompletedTask;
+                });
+            mockGuildUser
+                .Setup(user => user.RemoveRolesAsync(It.IsAny<IEnumerable<IRole>>(), It.IsAny<RequestOptions>()))
+                .Returns<IEnumerable<IRole>, RequestOptions>((removedRoles, options) =>
+                {
+                    // removedRoles can come from roles or roleIds, so make a copy of it and enumerate through that
+                    IRole[] removedRolesArray = removedRoles.ToArray();
+                    foreach (IRole role in removedRolesArray)
+                    {
+                        roles.Remove(role.Name);
+                        roleIds.Remove(role.Id);
+                    }
+
                     return Task.CompletedTask;
                 });
             mockGuildUser
@@ -285,6 +305,7 @@ namespace QBDiscordAssistantTests
                 .Returns<IRole, RequestOptions>((role, options) =>
                 {
                     roles.Add(role.Name);
+                    roleIds.Add(role.Id);
                     return Task.CompletedTask;
                 });
             return mockGuildUser.Object;

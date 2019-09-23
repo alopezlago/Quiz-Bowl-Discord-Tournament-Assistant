@@ -113,6 +113,47 @@ namespace QBDiscordAssistantTests
         }
 
         [TestMethod]
+        public async Task AddPlayerAndRemovePlayerUpdateRoles()
+        {
+            const ulong teamRoleId = 2;
+            this.InitializeWithCurrentTournament(
+                new List<string>() { "Reader_Room_1", $"Team_{TeamName}" },
+                out MessageStore messageStore,
+                out GlobalTournamentsManager globalManager,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            Team mainTeam = new Team()
+            {
+                Name = TeamName
+            };
+            state.AddTeams(new Team[] { mainTeam });
+
+            // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
+            // it directly here.
+            state.TournamentRoles = new TournamentRoleIds(
+                0, 
+                new ulong[] { 1 }, 
+                new KeyValuePair<Team, ulong>[] { new KeyValuePair<Team, ulong>(mainTeam, teamRoleId) } );
+            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+
+            IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
+            await commandHandler.AddPlayerAsync(guildUser, TeamName);
+            string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
+            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.Clear();
+
+            Assert.AreEqual(1, guildUser.RoleIds.Count, "Unexpected number of role IDs for added player");
+            Assert.AreEqual(teamRoleId, guildUser.RoleIds.First(), "Unexpected role ID");
+
+            await commandHandler.RemovePlayerAsync(guildUser);
+            expectedMessage = BotStrings.PlayerRemoved(guildUser.Mention);
+            messageStore.VerifyDirectMessages(expectedMessage);
+
+            Assert.AreEqual(0, guildUser.RoleIds.Count, "Unexpected number of role IDs for removed player");
+        }
+
+        [TestMethod]
         public async Task AddPlayersOnSameTeamSucceeds()
         {
             this.InitializeWithCurrentTournament(
@@ -484,12 +525,12 @@ namespace QBDiscordAssistantTests
             state.Schedule = new RoundRobinScheduleFactory(1)
                 .Generate(new HashSet<Team>(teams), new HashSet<Reader>(readers));
             state.TournamentRoles = new TournamentRoleIds(
-                0,
-                new ulong[] { 1 },
+                1,
+                new ulong[] { 2 },
                 new KeyValuePair<Team, ulong>[]
                 {
-                    new KeyValuePair<Team, ulong>(firstTeam, 2),
-                    new KeyValuePair<Team, ulong>(secondTeam, 3)
+                    new KeyValuePair<Team, ulong>(firstTeam, 3),
+                    new KeyValuePair<Team, ulong>(secondTeam, 4)
                 });
 
             IGuildUser readerUser = this.CreateGuildUser(DefaultUserId, new List<string>(roles));
@@ -810,8 +851,8 @@ namespace QBDiscordAssistantTests
                 .Returns<CacheMode, RequestOptions>((mode, options) =>
                 {
                     List<IGuildUser> guildUsers = new List<IGuildUser>();
-                    guildUsers.Add(this.CreateGuildUser(reader.Id, new List<string>()));
-                    guildUsers.AddRange(players.Select(player => this.CreateGuildUser(player.Id, new List<string>())));
+                    guildUsers.Add(this.CreateGuildUser(reader.Id));
+                    guildUsers.AddRange(players.Select(player => this.CreateGuildUser(player.Id)));
 
                     IReadOnlyCollection<IGuildUser> readOnlyGuildUsers = ImmutableArray.Create(guildUsers.ToArray());
                     return Task.FromResult(readOnlyGuildUsers);
@@ -956,9 +997,14 @@ namespace QBDiscordAssistantTests
                 }
             });
 
+            // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
+            // it directly here.
+            state.TournamentRoles = new TournamentRoleIds(
+                0, new ulong[] { 1 }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
+
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
-            IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId + 1, new List<string>());
+            IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId + 1);
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 2, new List<string>(readerRoles));
             await commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser);
             messageStore.VerifyDirectMessages(BotStrings.CouldntGetRoleForTheOldReader);
@@ -995,6 +1041,11 @@ namespace QBDiscordAssistantTests
             };
             state.AddReaders(new Reader[] { firstReader, secondReader });
 
+            // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
+            // it directly here.
+            state.TournamentRoles = new TournamentRoleIds(
+                0, new ulong[] { 1 }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
+
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
@@ -1015,6 +1066,7 @@ namespace QBDiscordAssistantTests
         public async Task SwitchReadersSucceeds()
         {
             const string role = "Reader_Room_1";
+            const ulong readerRoleId = 1;
             List<string> readerRoles = new List<string>(new string[] { role });
             this.InitializeWithCurrentTournament(
                 readerRoles,
@@ -1030,10 +1082,15 @@ namespace QBDiscordAssistantTests
             };
             state.AddReaders(new Reader[] { firstReader });
 
+            // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
+            // it directly here.
+            state.TournamentRoles = new TournamentRoleIds(
+                0, new ulong[] { readerRoleId } , Enumerable.Empty<KeyValuePair<Team, ulong>>());
+
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
-            IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1, new List<string>());
+            IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1);
             await commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser);
             messageStore.VerifyDirectMessages(BotStrings.ReadersSwitchedSuccessfully);
 
@@ -1044,7 +1101,7 @@ namespace QBDiscordAssistantTests
                 Assert.AreEqual(DefaultUserId + 1, currentTournament.Readers.First().Id, "Reader was not swapped.");
                 Assert.AreEqual(0, oldReaderUser.RoleIds.Count, "Old reader should no longer have reader role.");
                 Assert.AreEqual(1, newReaderUser.RoleIds.Count, "New reader should have a role.");
-                Assert.AreEqual(0u, newReaderUser.RoleIds.First(), "New reader should have reader role.");
+                Assert.AreEqual(readerRoleId, newReaderUser.RoleIds.First(), "New reader should have reader role.");
             });
         }
 
@@ -1052,6 +1109,7 @@ namespace QBDiscordAssistantTests
         public async Task SwitchReadersSameReader()
         {
             const string role = "Reader_Room_1";
+            const ulong readerRoleId = 1;
             List<string> readerRoles = new List<string>(new string[] { role });
             this.InitializeWithCurrentTournament(
                 readerRoles,
@@ -1066,6 +1124,11 @@ namespace QBDiscordAssistantTests
                 Name = "First Reader"
             };
             state.AddReaders(new Reader[] { reader });
+
+            // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
+            // it directly here.
+            state.TournamentRoles = new TournamentRoleIds(
+                0, new ulong[] { readerRoleId }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
