@@ -56,3 +56,5 @@ TODO: Have an option to allow for more automation, that would enable:
   - This would be a major change (v3?)
 
 TODO: Look into integrating with the Google Sheets API so we can listen to OphirStats updates and have the bot update point totals/TU numbers when the stats are updated.
+
+TODO: Update to .Net Core 3.0

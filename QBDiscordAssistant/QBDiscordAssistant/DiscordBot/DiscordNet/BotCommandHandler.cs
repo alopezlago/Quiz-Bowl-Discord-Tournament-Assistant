@@ -325,8 +325,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                     // TODO: We should split up this method.
                     IRole directorRole = this.Context.Guild.GetRole(currentTournament.TournamentRoles.DirectorRoleId);
-                    IRole[] roomReaderRoles = currentTournament.TournamentRoles.ReaderRoomRoleIds
-                        .Select(roleId => this.Context.Guild.GetRole(roleId)).ToArray();
+                    Dictionary<Reader, IRole> roomReaderRoles = currentTournament.TournamentRoles.ReaderRoomRoleIds
+                        .ToDictionary(kvp => kvp.Key, kvp => this.Context.Guild.GetRole(kvp.Value));
                     Dictionary<Team, IRole> teamRoles = currentTournament.TournamentRoles.TeamRoleIds
                         .ToDictionary(kvp => kvp.Key, kvp => this.Context.Guild.GetRole(kvp.Value));
 
@@ -573,7 +573,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public async Task SwitchReaderAsync(IGuildUser oldReaderUser, IGuildUser newReaderUser)
         {
             bool switchSuccessful = false;
-            ////IRole oldReaderRole = null;
             ulong oldReaderRoleId = 0;
             await DoReadWriteActionOnCurrentTournamentAsync(
                 async currentTournament =>
@@ -586,7 +585,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         return;
                     }
 
-                    oldReaderRoleId = currentTournament.TournamentRoles.ReaderRoomRoleIds
+                    oldReaderRoleId = currentTournament.TournamentRoles.ReaderRoomRoleIds.Select(kvp => kvp.Value)
                         .Join(oldReaderUser.RoleIds, id => id, id => id, (roomRoleId, readerRoleId) => roomRoleId)
                         .FirstOrDefault();
                     if (oldReaderRoleId == default(ulong))
@@ -734,7 +733,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return role;
         }
 
-        private async Task<IRole[]> AssignRoomReaderRolesAsync(ITournamentState state, IDictionary<ulong, IGuildUser> members)
+        private async Task<Dictionary<Reader, IRole>> AssignRoomReaderRolesAsync(
+            ITournamentState state, IDictionary<ulong, IGuildUser> members)
         {
             this.Logger.Debug("Assigning room reader roles to the readers");
             int roomsCount = state.Teams.Count() / 2;
@@ -748,11 +748,19 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             IRole[] roles = await Task.WhenAll(roomReaderRoleTasks);
+
             this.Logger.Debug("Finished assigning room reader roles to the readers");
-            return roles;
+
+            // TODO: See if there's a better way to create the dictionary in one pass instead of getting all the roles
+            // in an array first.
+            Dictionary<Reader, IRole> roomReaderRoles = state.Readers
+                .Select((reader, index) => new KeyValuePair<Reader, IRole>(reader, roles[index]))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            return roomReaderRoles;
         }
 
-        private async Task<IRole> AssignRoomReaderRoleAsync(string roleName, ulong readerId, IDictionary<ulong, IGuildUser> members)
+        private async Task<IRole> AssignRoomReaderRoleAsync(
+            string roleName, ulong readerId, IDictionary<ulong, IGuildUser> members)
         {
             IRole role = await this.Context.Guild.CreateRoleAsync(
                 roleName, permissions: PrivilegedGuildPermissions, color: Color.Green, options: RequestOptionsSettings.Default);
@@ -821,7 +829,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await Task.WhenAll(deleteChannelTasks);
             this.Logger.Debug("All channels created by the tournament {name} are deleted", state.Name);
 
-            IEnumerable<ulong> roleIds = state.TournamentRoles?.ReaderRoomRoleIds
+            IEnumerable<ulong> roleIds = state.TournamentRoles?.ReaderRoomRoleIds.Select(kvp => kvp.Value)
                 .Concat(state.TournamentRoles.TeamRoleIds.Select(kvp => kvp.Value))
                 .Concat(new ulong[] { state.TournamentRoles.DirectorRoleId });
             IEnumerable<Task> deleteRoleTasks = roleIds?
@@ -851,7 +859,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
 
             IRole directorRole = await this.AssignDirectorRoleAsync(state, members);
-            IRole[] roomReaderRoles = await this.AssignRoomReaderRolesAsync(state, members);
+            Dictionary<Reader, IRole> roomReaderRoles = await this.AssignRoomReaderRolesAsync(state, members);
             Dictionary<Team, IRole> teamRoles = await this.AssignPlayerRolesAsync(state, members);
             TournamentRoles roles = new TournamentRoles()
             {
@@ -939,8 +947,16 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 this.Context.Client.CurrentUser, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
             await channel.AddPermissionOverwriteAsync(
                 roles.DirectorRole, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
-            await channel.AddPermissionOverwriteAsync(
-                roles.RoomReaderRoles[roomNumber], PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
+
+            if (roles.RoomReaderRoles.TryGetValue(game.Reader, out IRole readerRole))
+            {
+                await channel.AddPermissionOverwriteAsync(
+                    readerRole, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
+            }
+            else
+            {
+                this.Logger.Warning("Could not find a reader role for a reader with ID {0}.", game.Reader?.Id);
+            }
 
             List<Task> addTeamRolesToChannel = new List<Task>();
             foreach (Team team in game.Teams)
@@ -1023,7 +1039,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             public IRole DirectorRole { get; set; }
 
-            public IRole[] RoomReaderRoles { get; set; }
+            public IDictionary<Reader, IRole> RoomReaderRoles { get; set; }
 
             public Dictionary<Team, IRole> TeamRoles { get; set; }
 
@@ -1031,7 +1047,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 return new TournamentRoleIds(
                     this.DirectorRole.Id,
-                    this.RoomReaderRoles.Select(role => role.Id).ToArray(),
+                    this.RoomReaderRoles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Id),
                     this.TeamRoles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Id));
             }
         }

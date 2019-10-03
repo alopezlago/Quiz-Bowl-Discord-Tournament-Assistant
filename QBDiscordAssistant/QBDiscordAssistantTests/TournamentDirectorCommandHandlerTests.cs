@@ -21,6 +21,12 @@ namespace QBDiscordAssistantTests
         const ulong DefaultUserId = 123;
         const string TeamName = "Team 1";
 
+        private static readonly Reader DefaultReader = new Reader()
+        {
+            Id = 3,
+            Name = "Reader"
+        };
+
         [TestMethod]
         public async Task AddPlayerTeamDoesntExist()
         {
@@ -129,11 +135,17 @@ namespace QBDiscordAssistantTests
             };
             state.AddTeams(new Team[] { mainTeam });
 
+            Reader reader = new Reader()
+            {
+                Id = 3,
+                Name = "Reader"
+            };
+
             // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
             // it directly here.
             state.TournamentRoles = new TournamentRoleIds(
                 0, 
-                new ulong[] { 1 }, 
+                new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong> (reader, 1) }, 
                 new KeyValuePair<Team, ulong>[] { new KeyValuePair<Team, ulong>(mainTeam, teamRoleId) } );
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
@@ -270,14 +282,25 @@ namespace QBDiscordAssistantTests
                 .ToArray();
             state.AddTeams(teams);
 
+            Reader[] readers = readerRoleIds
+                .Select(id => new Reader() { Id = id, Name = $"Reader {id}" })
+                .ToArray();
+            state.AddReaders(readers);
+
             Dictionary<Team, ulong> teamRoleIdMap = new Dictionary<Team, ulong>();
             for (int i = 0; i < teamRoleIds.Length; i++)
             {
                 teamRoleIdMap[teams[i]] = teamRoleIds[i];
             }
 
+            Dictionary<Reader, ulong> readerRoleIdMap = new Dictionary<Reader, ulong>();
+            for (int i = 0; i < readerRoleIds.Length; i++)
+            {
+                readerRoleIdMap[readers[i]] = readerRoleIds[i];
+            }
+
             state.ChannelIds = channelIds;
-            state.TournamentRoles = new TournamentRoleIds(directorId, readerRoleIds, teamRoleIdMap);
+            state.TournamentRoles = new TournamentRoleIds(directorId, readerRoleIdMap, teamRoleIdMap);
 
             await commandHandler.EndTournamentAsync();
             messageStore.VerifyDirectMessages(BotStrings.TournamentCleanupFinished(DefaultGuildName));
@@ -526,7 +549,10 @@ namespace QBDiscordAssistantTests
                 .Generate(new HashSet<Team>(teams), new HashSet<Reader>(readers));
             state.TournamentRoles = new TournamentRoleIds(
                 1,
-                new ulong[] { 2 },
+                new KeyValuePair<Reader, ulong>[] 
+                {
+                    new KeyValuePair<Reader, ulong>(reader, 2)
+                },
                 new KeyValuePair<Team, ulong>[]
                 {
                     new KeyValuePair<Team, ulong>(firstTeam, 3),
@@ -879,7 +905,7 @@ namespace QBDiscordAssistantTests
 
             state.TournamentRoles = new TournamentRoleIds(
                 0,
-                new ulong[] { 1 },
+                new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, 1) },
                 new KeyValuePair<Team, ulong>[]
                 {
                     new KeyValuePair<Team, ulong>(firstTeam, 2),
@@ -989,18 +1015,19 @@ namespace QBDiscordAssistantTests
                 out BotCommandHandler commandHandler,
                 out ITournamentState state);
 
-            state.AddReaders(new Reader[] {
-                new Reader()
-                {
-                    Id = DefaultUserId,
-                    Name = "Name"
-                }
-            });
+            Reader reader = new Reader()
+            {
+                Id = DefaultUserId,
+                Name = "Name"
+            };
+            state.AddReaders(new Reader[] { reader });
 
             // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
             // it directly here.
             state.TournamentRoles = new TournamentRoleIds(
-                0, new ulong[] { 1 }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
+                0,
+                new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, 1) },
+                Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
@@ -1044,7 +1071,13 @@ namespace QBDiscordAssistantTests
             // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
             // it directly here.
             state.TournamentRoles = new TournamentRoleIds(
-                0, new ulong[] { 1 }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
+                0,
+                new KeyValuePair<Reader, ulong>[] 
+                { 
+                    new KeyValuePair<Reader, ulong>(firstReader, 1),
+                    new KeyValuePair<Reader, ulong>(secondReader, 2)
+                },
+                Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
@@ -1058,7 +1091,7 @@ namespace QBDiscordAssistantTests
             VerifyOnCurrentTournament(manager, currentTournament =>
             {
                 Assert.IsTrue(currentTournament.Readers.Contains(firstReader), "First reader was removed.");
-                Assert.IsTrue(currentTournament.Readers.Contains(secondReader), "First reader was removed.");
+                Assert.IsTrue(currentTournament.Readers.Contains(secondReader), "Second reader was removed.");
             });
         }
 
@@ -1085,7 +1118,9 @@ namespace QBDiscordAssistantTests
             // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
             // it directly here.
             state.TournamentRoles = new TournamentRoleIds(
-                0, new ulong[] { readerRoleId } , Enumerable.Empty<KeyValuePair<Team, ulong>>());
+                0,
+                new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(firstReader, readerRoleId) },
+                Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 
@@ -1128,7 +1163,9 @@ namespace QBDiscordAssistantTests
             // TournamentRoles is initialized in Setup in the command handler, but to avoid all that work we create
             // it directly here.
             state.TournamentRoles = new TournamentRoleIds(
-                0, new ulong[] { readerRoleId }, Enumerable.Empty<KeyValuePair<Team, ulong>>());
+                0, 
+                new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, readerRoleId) }, 
+                Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
             state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
 

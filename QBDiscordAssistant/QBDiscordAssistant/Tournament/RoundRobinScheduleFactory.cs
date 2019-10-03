@@ -9,10 +9,12 @@ namespace QBDiscordAssistant.Tournament
         internal const int MaximumBrackets = 6;
 
         private readonly int roundRobins;
+        private readonly Random generator;
 
-        public RoundRobinScheduleFactory(int roundRobins)
+        public RoundRobinScheduleFactory(int roundRobins, int? seed = null)
         {
             this.roundRobins = roundRobins;
+            this.generator = seed.HasValue ? new Random(seed.GetValueOrDefault()) : new Random();
         }
 
         public Schedule Generate(IEnumerable<ISet<Team>> teams, ISet<Reader> readers)
@@ -53,12 +55,14 @@ namespace QBDiscordAssistant.Tournament
                 .Select(number => new Round())
                 .ToArray();
 
-            // TODO: Investigate if it makes sense to parallelize this
+            // TODO: Investigate if it makes sense to parallelize this. Note that Random is not thread-safe, so we'd
+            // need to switch to a thread safe randomizer, or use a different Random instance in each.
             foreach (Bracket bracket in brackets)
             {
+                Reader[] bracketReaders = bracket.Readers.ToArray();
                 for (int i = 0; i < bracket.Rounds; i++)
                 {
-                    this.AddBracketGamesToRound(rounds[i], bracket, i);
+                    this.AddBracketGamesToRound(rounds[i], bracket, bracketReaders);
                 }
             }
 
@@ -117,19 +121,11 @@ namespace QBDiscordAssistant.Tournament
             bottomRow[bottomRow.Length - 1] = leavingTopRowTeam;
         }
 
-        private void AddBracketGamesToRound(Round round, Bracket bracket, int roundNumber)
+        private void AddBracketGamesToRound(Round round, Bracket bracket, Reader[] bracketReaders)
         {
-            IEnumerable<Reader> readersEnumerable = bracket.Readers;
-            if (roundNumber % 2 == 1)
-            {
-                // Reverse the readers every other round. This should ensure that, when there are over 4 teams, that no
-                // team has the same reader each round
-                // This approach does have the downside of doing O(|readers|) work every other round. If this is too
-                // slow, we should save the reversed enumerable, then pass both in.
-                readersEnumerable = readersEnumerable.Reverse();
-            }
+            ShuffleArray(bracketReaders, this.generator);
 
-            using (IEnumerator<Reader> readers = readersEnumerable.GetEnumerator())
+            using (IEnumerator<Reader> readers = bracketReaders.AsEnumerable().GetEnumerator())
             {
                 GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
             }
@@ -228,6 +224,21 @@ namespace QBDiscordAssistant.Tournament
                     enumerator.MoveNext();
                     bottomRow[i] = enumerator.Current;
                 }
+            }
+        }
+
+        // Uses "modern" variant of Fisher-Yates shuffle found on wiki
+        // Will be weak because we're using the regular Random class
+        // TODO: Investigate using a Mersenne Twister library, or taking any performance hits and using a CSPRNG
+        private static void ShuffleArray<T>(T[] array, Random generator)
+        {
+            for (int i = array.Length - 1; i >= 1; --i)
+            {
+                // Pick from [0, i], so we need to generate i + 1 numbers
+                int index = generator.Next(i + 1);
+                T temp = array[i];
+                array[i] = array[index];
+                array[index] = temp;
             }
         }
 
