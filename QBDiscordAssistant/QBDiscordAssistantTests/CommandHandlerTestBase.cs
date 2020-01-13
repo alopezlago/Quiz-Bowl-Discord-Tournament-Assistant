@@ -368,7 +368,7 @@ namespace QBDiscordAssistantTests
                     Environment.NewLine, fields.Select(field => $"{field.Key}: {field.Value}"));
             }
             string embedText = fieldsText.Length > 0 ?
-                $"{title}{Environment.NewLine}{description}{Environment.NewLine}{fields}" :
+                $"{title}{Environment.NewLine}{description}{Environment.NewLine}{fieldsText}" :
                 $"{title}{Environment.NewLine}{description}";
             return embedText;
         }
