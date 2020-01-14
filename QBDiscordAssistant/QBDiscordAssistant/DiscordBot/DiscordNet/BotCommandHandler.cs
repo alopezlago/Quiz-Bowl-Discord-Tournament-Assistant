@@ -938,13 +938,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 RequestOptionsSettings.Default);
             this.Logger.Debug("Text channel for room {0} in round {1} created", roomNumber, roundNumber);
 
+            // We need to add the bot's permissions first before we disable permissions for everyone.
+            await channel.AddPermissionOverwriteAsync(
+                this.Context.Client.CurrentUser, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
+
             this.Logger.Debug("Adding permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
             await channel.AddPermissionOverwriteAsync(
                 this.Context.Guild.EveryoneRole, EveryonePermissions, RequestOptionsSettings.Default);
-
-            // TODO: Give the bot less-than-privileged permissions.
-            await channel.AddPermissionOverwriteAsync(
-                this.Context.Client.CurrentUser, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
             await channel.AddPermissionOverwriteAsync(
                 roles.DirectorRole, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
 
