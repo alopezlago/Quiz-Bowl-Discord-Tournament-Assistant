@@ -1,9 +1,9 @@
-﻿using Discord;
+﻿using System;
+using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using QBDiscordAssistant.Tournament;
-using System;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -26,7 +26,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (result.Success && result.Value)
             {
                 return Task.FromResult(PreconditionResult.FromSuccess());
-            } 
+            }
             else if (command.Name == SetupCommandName && context.Message.Content.Length > SetupCommand.Length)
             {
                 // TODO: We should investigate if there's a better place to make this check, because the attribute

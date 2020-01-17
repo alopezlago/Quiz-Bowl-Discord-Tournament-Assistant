@@ -1,17 +1,17 @@
-﻿using Discord.Commands;
+﻿using System.Threading.Tasks;
+using Discord.Commands;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using QBDiscordAssistant;
 using QBDiscordAssistant.DiscordBot.DiscordNet;
 using QBDiscordAssistant.Tournament;
 using QBDiscordAssistantTests.Utilities;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
 {
     [TestClass]
     public class GuildBotCommandHandlerTests : CommandHandlerTestBase
     {
-        const ulong DefaultUserId = 2;
+        private const ulong DefaultUserId = 2;
 
         [TestMethod]
         public async Task NoCurrentTournament()

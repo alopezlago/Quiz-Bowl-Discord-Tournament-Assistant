@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using QBDiscordAssistant;
-using System.Collections.Generic;
 
 namespace QBDiscordAssistantTests
 {

@@ -1,12 +1,12 @@
-﻿using Discord;
+﻿using System;
+using System.Reflection;
+using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
-using System;
-using System.Reflection;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -43,7 +43,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         }
 
         private BotEventHandler EventHandler { get; set; }
-        
+
         // TODO: See if we can make this generic. LoginAsync doens't work with IDiscordClient.
         private DiscordSocketClient Client { get; set; }
 

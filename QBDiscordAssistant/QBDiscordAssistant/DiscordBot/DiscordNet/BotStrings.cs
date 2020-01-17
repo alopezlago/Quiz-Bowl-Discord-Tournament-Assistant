@@ -39,7 +39,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             return $"All possible tournament artifacts cleaned up in guild '{guildName}'.";
         }
-       
+
         public static string CannotGoBack(TournamentStage stage)
         {
             return $"Cannot go back from the stage {stage}.";

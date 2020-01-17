@@ -48,7 +48,7 @@ namespace QBDiscordAssistant
                     {
                         teamNames.Add(teamName);
                     }
-                    
+
                     startIndex = i;
                     possibleCommaEscapeStart = false;
                 }

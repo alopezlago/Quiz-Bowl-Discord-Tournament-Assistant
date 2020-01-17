@@ -1,6 +1,6 @@
-﻿using Discord;
+﻿using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -89,8 +89,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             this.Logger.Information(
                 "{0} is attempting to start finals with the reader {1} and teams {2}",
-                this.Context.User.Id, 
-                readerUser.Id, 
+                this.Context.User.Id,
+                readerUser.Id,
                 rawTeamNameParts);
             return this.HandleCommandAsync(commandHandler => commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts));
         }

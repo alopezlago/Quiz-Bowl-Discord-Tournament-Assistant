@@ -1,6 +1,6 @@
-﻿using QBDiscordAssistant.Tournament;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
+using QBDiscordAssistant.Tournament;
 
 namespace QBDiscordAssistant
 {

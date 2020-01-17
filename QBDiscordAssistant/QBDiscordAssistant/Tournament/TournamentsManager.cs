@@ -12,7 +12,7 @@ namespace QBDiscordAssistant.Tournament
         private const int mutexTimeoutMs = 60 * 1000; // 1 minute
 
         private readonly ConcurrentDictionary<string, ITournamentState> pendingTournaments;
-        private ReaderWriterLockSlim currentTournamentLock;
+        private readonly ReaderWriterLockSlim currentTournamentLock;
 
         public TournamentsManager()
         {

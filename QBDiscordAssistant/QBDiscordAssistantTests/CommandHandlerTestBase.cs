@@ -1,15 +1,15 @@
-﻿using Discord;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using QBDiscordAssistant;
 using QBDiscordAssistant.Tournament;
 using QBDiscordAssistantTests.Utilities;
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
 {
@@ -20,8 +20,8 @@ namespace QBDiscordAssistantTests
         protected const string DefaultTournamentName = "My Tournament";
 
         protected ITournamentState AddCurrentTournament(
-            GlobalTournamentsManager globalManager, 
-            ulong guildId = DefaultGuildId, 
+            GlobalTournamentsManager globalManager,
+            ulong guildId = DefaultGuildId,
             string tournamentName = DefaultTournamentName)
         {
             TournamentsManager manager = globalManager.GetOrAdd(guildId, id => new TournamentsManager());
@@ -235,10 +235,10 @@ namespace QBDiscordAssistantTests
                     });
                 mockGuild
                     .Setup(guild => guild.CreateRoleAsync(
-                        It.IsAny<string>(), 
-                        It.IsAny<GuildPermissions?>(), 
-                        It.IsAny<Color?>(), 
-                        It.IsAny<bool>(), 
+                        It.IsAny<string>(),
+                        It.IsAny<GuildPermissions?>(),
+                        It.IsAny<Color?>(),
+                        It.IsAny<bool>(),
                         It.IsAny<RequestOptions>()))
                     .Returns<string, GuildPermissions?, Color?, bool, RequestOptions>(
                         (name, permissions, color, isHoisted, options) =>
@@ -355,7 +355,7 @@ namespace QBDiscordAssistantTests
 
         protected string GetMockEmbedText(IEmbed embed)
         {
-            return GetMockEmbedText(
+            return this.GetMockEmbedText(
                 embed.Title, embed.Description, embed.Fields.ToDictionary(field => field.Name, field => field.Value));
         }
 

@@ -1,8 +1,8 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using QBDiscordAssistant.Tournament;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using QBDiscordAssistant.Tournament;
 
 namespace QBDiscordAssistantTests
 {
@@ -176,9 +176,9 @@ namespace QBDiscordAssistantTests
                 teamOpponentsMap.Count,
                 $"Unexpected number of teams (for {roundsCount} rounds and {teams.Count} teams).");
             Team shortchangedTeam = teamOpponentsMap.FirstOrDefault(pair => pair.Value.Count != matchesPerTeam).Key;
-             Assert.IsNull(
-                shortchangedTeam,
-                $"Team with name {shortchangedTeam?.Name} did not play exactly {matchesPerTeam} games (for {roundsCount} rounds and {teams.Count} teams).");
+            Assert.IsNull(
+               shortchangedTeam,
+               $"Team with name {shortchangedTeam?.Name} did not play exactly {matchesPerTeam} games (for {roundsCount} rounds and {teams.Count} teams).");
             Team skippingTeam = teamOpponentsMap
                 .FirstOrDefault(pair => pair.Value.Distinct().Count() != otherTeamsCount).Key;
             Assert.IsNull(
@@ -224,7 +224,7 @@ namespace QBDiscordAssistantTests
                 Dictionary<Team, List<Team>> bracketOpponentsMap = teamOpponentsMap
                     .Where(kvp => teams.Contains(kvp.Key))
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-                
+
                 Assert.AreEqual(
                     teams.Count,
                     bracketOpponentsMap.Count,

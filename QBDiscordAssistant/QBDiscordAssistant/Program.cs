@@ -1,24 +1,24 @@
-using Newtonsoft.Json;
-using Serilog;
-using Serilog.Events;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Serilog;
+using Serilog.Events;
 
 namespace QBDiscordAssistant
 {
-    class Program
+    internal class Program
     {
         // 200 MB file limit
-        const long maxLogfileSize = 1024 * 1024 * 200;
+        private const long maxLogfileSize = 1024 * 1024 * 200;
 
         // Following the example from https://dsharpplus.emzi0767.com/articles/first_bot.html
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             MainAsync(args).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
-        static async Task MainAsync(string[] args)
+        private static async Task MainAsync(string[] args)
         {
             LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
                 .WriteTo.Console()
@@ -57,7 +57,7 @@ namespace QBDiscordAssistant
             Log.Information("Bot escaped infinite delay. Should investigate");
         }
 
-        static async Task<BotConfiguration> GetConfiguration()
+        private static async Task<BotConfiguration> GetConfiguration()
         {
             // TODO: Get the token from an encrypted file. This could be done by using DPAPI and writing a tool to help
             // convert the user access token into a token file using DPAPI. The additional entropy could be a config

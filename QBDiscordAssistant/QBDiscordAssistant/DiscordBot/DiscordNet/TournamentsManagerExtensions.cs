@@ -1,7 +1,7 @@
-﻿using Discord;
-using QBDiscordAssistant.Tournament;
-using System;
+﻿using System;
 using System.Threading.Tasks;
+using Discord;
+using QBDiscordAssistant.Tournament;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {

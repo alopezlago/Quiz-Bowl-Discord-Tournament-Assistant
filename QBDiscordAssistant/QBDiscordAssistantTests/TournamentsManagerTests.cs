@@ -1,6 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System.Threading.Tasks;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using QBDiscordAssistant.Tournament;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
 {
@@ -41,9 +41,8 @@ namespace QBDiscordAssistantTests
                 GuildId = 1
             };
 
-            ITournamentState state;
             Assert.IsFalse(
-                manager.TryGetTournament(DefaultTournamentName, out state), "No tournament state should exist.");
+                manager.TryGetTournament(DefaultTournamentName, out ITournamentState state), "No tournament state should exist.");
 
             TournamentState newState = new TournamentState(1, DefaultTournamentName);
             manager.AddOrUpdateTournament(DefaultTournamentName, newState, (name, oldState) => oldState);

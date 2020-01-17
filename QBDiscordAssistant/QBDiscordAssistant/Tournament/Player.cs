@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace QBDiscordAssistant.Tournament
+﻿namespace QBDiscordAssistant.Tournament
 {
     public class Player
     {

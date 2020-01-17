@@ -1,18 +1,18 @@
-﻿using Discord;
+﻿using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using QBDiscordAssistant;
 using QBDiscordAssistant.DiscordBot.DiscordNet;
 using QBDiscordAssistant.Tournament;
 using QBDiscordAssistantTests.Utilities;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistantTests
 {
     [TestClass]
     public class AdminBotCommandHandlerTests : CommandHandlerTestBase
     {
-        const ulong DefaultUserId = 1234;
+        private const ulong DefaultUserId = 1234;
 
         [TestMethod]
         public async Task AddTournamentDirector()
@@ -23,7 +23,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
+            IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
                 DefaultTournamentName, DefaultGuildName);
@@ -48,7 +48,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(secondUserId);
+            IGuildUser guildUser = this.CreateGuildUser(secondUserId);
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
                 DefaultTournamentName, DefaultGuildName);
@@ -72,7 +72,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
+            IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.UserAlreadyTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
@@ -94,7 +94,7 @@ namespace QBDiscordAssistantTests
 
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(DefaultUserId);
+            IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.RemovedTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
@@ -116,7 +116,7 @@ namespace QBDiscordAssistantTests
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
             AddTournamentDirectorDirectly(globalManager, DefaultUserId);
 
-            IGuildUser guildUser = CreateGuildUser(otherId);
+            IGuildUser guildUser = this.CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.UserNotTournamentDirector(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);
@@ -136,7 +136,7 @@ namespace QBDiscordAssistantTests
             GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
             BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
 
-            IGuildUser guildUser = CreateGuildUser(otherId);
+            IGuildUser guildUser = this.CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.TournamentDoesNotExist(DefaultTournamentName, DefaultGuildName);
             messageStore.VerifyDirectMessages(expectedMessage);

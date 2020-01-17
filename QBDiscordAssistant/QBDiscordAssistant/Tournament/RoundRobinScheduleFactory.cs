@@ -19,10 +19,10 @@ namespace QBDiscordAssistant.Tournament
 
         public Schedule Generate(IEnumerable<ISet<Team>> teams, ISet<Reader> readers)
         {
-            if (roundRobins <= 0)
+            if (this.roundRobins <= 0)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(roundRobins), TournamentStrings.RoundRobinsMustBePositive(roundRobins));
+                    nameof(this.roundRobins), TournamentStrings.RoundRobinsMustBePositive(this.roundRobins));
             }
 
             int bracketsCount = teams.Count();
@@ -127,7 +127,7 @@ namespace QBDiscordAssistant.Tournament
 
             using (IEnumerator<Reader> readers = bracketReaders.AsEnumerable().GetEnumerator())
             {
-                GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
+                this.GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
             }
         }
 

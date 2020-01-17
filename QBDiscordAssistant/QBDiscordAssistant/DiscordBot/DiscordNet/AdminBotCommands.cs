@@ -1,7 +1,6 @@
-﻿using Discord;
+﻿using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
-using Serilog;
-using System.Threading.Tasks;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {

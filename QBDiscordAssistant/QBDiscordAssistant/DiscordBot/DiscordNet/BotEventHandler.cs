@@ -1,13 +1,13 @@
-﻿using Discord;
-using Discord.WebSocket;
-using QBDiscordAssistant.Tournament;
-using Serilog;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Discord;
+using Discord.WebSocket;
+using QBDiscordAssistant.Tournament;
+using Serilog;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -159,7 +159,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 .GetTournamentsManager(guildChannel.Guild)
                 .TryReadWriteActionOnCurrentTournament(currentTournament =>
                 {
-                    player = GetPlayerFromReactionEventOrNull(
+                    player = this.GetPlayerFromReactionEventOrNull(
                         currentTournament, guildUser, message.Id, reaction.Emote.Name, out errorMessage);
                     if (player == null)
                     {
@@ -228,7 +228,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 guildUser,
                 async currentTournament =>
                 {
-                    Player player = GetPlayerFromReactionEventOrNull(
+                    Player player = this.GetPlayerFromReactionEventOrNull(
                         currentTournament, guildUser, cachedMessage.Id, reaction.Emote.Name, out string errorMessage);
                     if (player == null)
                     {
@@ -342,9 +342,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         }
 
         private Player GetPlayerFromReactionEventOrNull(
-            IReadOnlyTournamentState currentTournament, 
+            IReadOnlyTournamentState currentTournament,
             IGuildUser user,
-            ulong messageId, 
+            ulong messageId,
             string emojiName,
             out string errorMessage)
         {
@@ -438,7 +438,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             string[] teamsList = message.Content.Split("\n");
             List<Team> teams = new List<Team>();
             string errorMessage;
-            for (int i  = 0; i < teamsList.Length; i++)
+            for (int i = 0; i < teamsList.Length; i++)
             {
                 string teamList = teamsList[i];
                 if (!TeamNameParser.TryGetTeamNamesFromParts(
@@ -506,9 +506,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             List<Task> addReactionsTasks = new List<Task>();
             for (int i = 0; i < addPlayersEmbedsCount; i++)
             {
-                EmbedBuilder embedBuilder = new EmbedBuilder();
-                embedBuilder.Title = BotStrings.JoinTeams;
-                embedBuilder.Description = BotStrings.ClickOnReactionsJoinTeam;
+                EmbedBuilder embedBuilder = new EmbedBuilder
+                {
+                    Title = BotStrings.JoinTeams,
+                    Description = BotStrings.ClickOnReactionsJoinTeam
+                };
                 int fieldCount = 0;
                 List<IEmote> emotesForMessage = new List<IEmote>();
                 while (fieldCount < MaxTeamsInMessage && teamsEnumerator.MoveNext())
@@ -537,19 +539,19 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private Task OnMessageReceived(SocketMessage message)
         {
-            return HandleEvent(() => HandleOnMessageReceived(message));
+            return this.HandleEvent(() => this.HandleOnMessageReceived(message));
         }
 
         private Task OnReactionAdded(
             Cacheable<IUserMessage, ulong> cachedMessage, ISocketMessageChannel messageChannel, SocketReaction reaction)
         {
-            return HandleEvent(() => HandleOnReactionAdded(cachedMessage, messageChannel, reaction));
+            return this.HandleEvent(() => this.HandleOnReactionAdded(cachedMessage, messageChannel, reaction));
         }
 
         private Task OnReactionRemoved(
             Cacheable<IUserMessage, ulong> cachedMessage, ISocketMessageChannel messageChannel, SocketReaction reaction)
         {
-            return HandleEvent(() => HandleOnReactionRemoved(cachedMessage, messageChannel, reaction));
+            return this.HandleEvent(() => this.HandleOnReactionRemoved(cachedMessage, messageChannel, reaction));
         }
 
         private async Task UpdateStage(ITournamentState tournament, TournamentStage stage, IMessageChannel channel)
@@ -560,9 +562,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            EmbedBuilder addTeamsEmbedBuilder = new EmbedBuilder();
-            addTeamsEmbedBuilder.Title = title;
-            addTeamsEmbedBuilder.Description = instructions;
+            EmbedBuilder addTeamsEmbedBuilder = new EmbedBuilder
+            {
+                Title = title,
+                Description = instructions
+            };
             await channel.SendMessageAsync(
                 embed: addTeamsEmbedBuilder.Build(), options: RequestOptionsSettings.Default);
             this.Logger.Debug("Moved to stage {stage}", stage);
@@ -570,8 +574,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private static TournamentsManager CreateTournamentsManager(ulong id)
         {
-            TournamentsManager manager = new TournamentsManager();
-            manager.GuildId = id;
+            TournamentsManager manager = new TournamentsManager
+            {
+                GuildId = id
+            };
             return manager;
         }
 
