@@ -4,8 +4,6 @@ using Discord.Commands;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
-    [RequireOwner]
-    [RequireUserPermission(GuildPermission.Administrator)]
     [RequireTournamentDirector]
     public class TournamentDirectorBotCommands : BotCommandsBase
     {
