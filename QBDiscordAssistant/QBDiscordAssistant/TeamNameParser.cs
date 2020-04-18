@@ -43,7 +43,7 @@ namespace QBDiscordAssistant
                     teamName = combinedTeamNames
                         .Substring(startIndex, length)
                         .Trim()
-                        .Replace(",,", ",");
+                        .Replace(",,", ",", StringComparison.InvariantCulture);
                     if (previousTeamNames.Add(teamName))
                     {
                         teamNames.Add(teamName);
@@ -66,7 +66,7 @@ namespace QBDiscordAssistant
             teamName = combinedTeamNames
                 .Substring(startIndex, length)
                 .Trim()
-                .Replace(",,", ",");
+                .Replace(",,", ",", StringComparison.InvariantCulture);
             if (!previousTeamNames.Contains(teamName))
             {
                 teamNames.Add(teamName);

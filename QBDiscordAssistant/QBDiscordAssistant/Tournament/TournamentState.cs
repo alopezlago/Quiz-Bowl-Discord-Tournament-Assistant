@@ -98,6 +98,8 @@ namespace QBDiscordAssistant.Tournament
         /// <returns>true if the player was added to the tournament. false if the player is already in the tournament.</returns>
         public bool TryAddPlayer(Player player)
         {
+            Verify.IsNotNull(player, nameof(player));
+
             if (this.players.ContainsKey(player.Id))
             {
                 return false;
@@ -126,6 +128,8 @@ namespace QBDiscordAssistant.Tournament
 
         public void AddReaders(IEnumerable<Reader> readers)
         {
+            Verify.IsNotNull(readers, nameof(readers));
+
             foreach (Reader reader in readers)
             {
                 this.readers[reader.Id] = reader;
@@ -165,6 +169,8 @@ namespace QBDiscordAssistant.Tournament
 
         public void AddTeams(IEnumerable<Team> teams)
         {
+            Verify.IsNotNull(teams, nameof(teams));
+
             foreach (Team team in teams)
             {
                 this.teams[team.Name] = team;
@@ -173,6 +179,8 @@ namespace QBDiscordAssistant.Tournament
 
         public void RemoveTeams(IEnumerable<Team> teams)
         {
+            Verify.IsNotNull(teams, nameof(teams));
+
             foreach (Team team in teams)
             {
                 this.teams.Remove(team.Name);
@@ -238,7 +246,7 @@ namespace QBDiscordAssistant.Tournament
 
         public override int GetHashCode()
         {
-            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode();
+            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode(StringComparison.InvariantCulture);
         }
 
         private int GetMaximumTeamCount()

@@ -16,6 +16,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public override Task<PreconditionResult> CheckPermissionsAsync(
             ICommandContext context, CommandInfo command, IServiceProvider serviceProvider)
         {
+            Verify.IsNotNull(context, nameof(context));
+
             GlobalTournamentsManager globalManager = serviceProvider.GetService<GlobalTournamentsManager>();
             TournamentsManager manager = globalManager.GetOrAdd(context.Guild.Id, CreateTournamentsManager);
 

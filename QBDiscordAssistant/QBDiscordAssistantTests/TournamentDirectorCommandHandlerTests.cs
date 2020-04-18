@@ -21,12 +21,6 @@ namespace QBDiscordAssistantTests
         private const ulong DefaultUserId = 123;
         private const string TeamName = "Team 1";
 
-        private static readonly Reader DefaultReader = new Reader()
-        {
-            Id = 3,
-            Name = "Reader"
-        };
-
         [TestMethod]
         public async Task AddPlayerTeamDoesntExist()
         {

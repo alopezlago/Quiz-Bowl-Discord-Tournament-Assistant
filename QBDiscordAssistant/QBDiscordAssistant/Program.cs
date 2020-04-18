@@ -13,12 +13,12 @@ namespace QBDiscordAssistant
         private const long maxLogfileSize = 1024 * 1024 * 200;
 
         // Following the example from https://dsharpplus.emzi0767.com/articles/first_bot.html
-        public static void Main(string[] args)
+        public static void Main()
         {
-            MainAsync(args).ConfigureAwait(false).GetAwaiter().GetResult();
+            MainAsync().ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
-        private static async Task MainAsync(string[] args)
+        private static async Task MainAsync()
         {
             LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
                 .WriteTo.Console()

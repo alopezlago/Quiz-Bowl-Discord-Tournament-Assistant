@@ -11,8 +11,6 @@ namespace QBDiscordAssistantTests
     [TestClass]
     public class GuildBotCommandHandlerTests : CommandHandlerTestBase
     {
-        private const ulong DefaultUserId = 2;
-
         [TestMethod]
         public async Task NoCurrentTournament()
         {

@@ -21,7 +21,7 @@ namespace QBDiscordAssistant.Tournament
 
         public override int GetHashCode()
         {
-            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode();
+            return this.Name.ToLower(CultureInfo.CurrentCulture).GetHashCode(StringComparison.InvariantCulture);
         }
 
         public override string ToString()

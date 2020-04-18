@@ -4,8 +4,9 @@
     {
         public static bool IsTorunamentInPlayStage(this IReadOnlyTournamentState tournamentState)
         {
-            return tournamentState.Stage == TournamentStage.RunningPrelims ||
-                tournamentState.Stage == TournamentStage.Finals;
+            return tournamentState != null &&
+                (tournamentState.Stage == TournamentStage.RunningPrelims ||
+                    tournamentState.Stage == TournamentStage.Finals);
         }
     }
 }

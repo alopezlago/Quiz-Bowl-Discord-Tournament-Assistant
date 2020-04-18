@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ using Serilog;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
-    public class BotEventHandler : IDisposable
+    public sealed class BotEventHandler : IDisposable
     {
         private const int MaxTeamsInMessage = 20;
 
@@ -20,6 +21,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         // straight transfer first.
         public BotEventHandler(DiscordSocketClient client, GlobalTournamentsManager globalManager)
         {
+            Verify.IsNotNull(client, nameof(client));
+
             this.IsDisposed = false;
             this.Client = client;
             this.GlobalManager = globalManager;
@@ -55,7 +58,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         // TODO: Test these methods
         internal async Task HandleOnMessageReceived(SocketMessage message)
         {
-            if (message.Content.TrimStart().StartsWith("!"))
+            if (message.Content.TrimStart().StartsWith("!", StringComparison.InvariantCulture))
             {
                 // Ignore commands
                 this.Logger.Verbose("Message ignored because it's a command");
@@ -128,6 +131,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 });
         }
 
+        [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Event handler signature")]
+        [SuppressMessage("Style", "CA1801:Remove unused parameter", Justification = "Event handler signature")]
         internal async Task HandleOnReactionAdded(
             Cacheable<IUserMessage, ulong> cachedMessage, ISocketMessageChannel messageChannel, SocketReaction reaction)
         {
@@ -195,6 +200,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
         }
 
+        [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Event handler signature")]
+        [SuppressMessage("Style", "CA1801:Remove unused parameter", Justification = "Event handler signature")]
         internal async Task HandleOnReactionRemoved(
             Cacheable<IUserMessage, ulong> cachedMessage, ISocketMessageChannel messageChannel, SocketReaction reaction)
         {
@@ -329,14 +336,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return true;
         }
 
-        private async Task AddReactionsToMessage(
+        private async static Task AddReactionsToMessage(
             IUserMessage message, IEnumerable<IEmote> emotesForMessage, ITournamentState currentTournament)
         {
             currentTournament.AddJoinTeamMessageId(message.Id);
             await message.AddReactionsAsync(emotesForMessage.ToArray(), RequestOptionsSettings.Default);
         }
 
-        private int GetMaximumTeamCount(IReadOnlyTournamentState currentTournament)
+        private static int GetMaximumTeamCount(IReadOnlyTournamentState currentTournament)
         {
             return currentTournament.Readers.Count() * 2 + 1;
         }
@@ -469,7 +476,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            int maxTeamsCount = this.GetMaximumTeamCount(currentTournament);
+            int maxTeamsCount = GetMaximumTeamCount(currentTournament);
             if (teamsCount > maxTeamsCount)
             {
                 currentTournament.TryClearTeams();
@@ -530,7 +537,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 IUserMessage newMessage = await message.Channel.SendMessageAsync(
                     embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
                 currentTournament.AddJoinTeamMessageId(newMessage.Id);
-                addReactionsTasks.Add(this.AddReactionsToMessage(newMessage, emotesForMessage, currentTournament));
+                addReactionsTasks.Add(AddReactionsToMessage(newMessage, emotesForMessage, currentTournament));
             }
 
             await Task.WhenAll(addReactionsTasks);

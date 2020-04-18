@@ -50,6 +50,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public BotCommandHandler(ICommandContext context, GlobalTournamentsManager globalManager)
         {
+            Verify.IsNotNull(context, nameof(context));
+            Verify.IsNotNull(globalManager, nameof(globalManager));
+
             this.Context = context;
             this.GlobalManager = globalManager;
             this.Logger = Log
@@ -65,6 +68,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public async Task AddPlayerAsync(IGuildUser user, string teamName)
         {
+            Verify.IsNotNull(user, nameof(user));
+
             bool addPlayerSuccessful = false;
             ulong teamRoleId = default(ulong);
             await this.DoReadWriteActionOnCurrentTournamentAsync(
@@ -135,6 +140,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public Task AddTournamentDirectorAsync(IGuildUser newDirector, string tournamentName)
         {
+            Verify.IsNotNull(newDirector, nameof(newDirector));
+
             if (string.IsNullOrWhiteSpace(tournamentName))
             {
                 this.Logger.Debug("Did not add {id} to tournament with blank name", newDirector.Id);
@@ -407,6 +414,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public async Task RemovePlayerAsync(IGuildUser user)
         {
+            Verify.IsNotNull(user, nameof(user));
+
             bool removedSuccessfully = false;
             IEnumerable<ulong> teamRoleIds = null;
             await this.DoReadWriteActionOnCurrentTournamentAsync(
@@ -450,6 +459,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public async Task RemoveTournamentDirectorAsync(IGuildUser oldDirector, string tournamentName)
         {
+            Verify.IsNotNull(oldDirector, nameof(oldDirector));
+
             if (string.IsNullOrWhiteSpace(tournamentName))
             {
                 this.Logger.Debug("Couldn't remove director {id} for tournament with blank name", oldDirector.Id);
@@ -572,6 +583,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public async Task SwitchReaderAsync(IGuildUser oldReaderUser, IGuildUser newReaderUser)
         {
+            Verify.IsNotNull(oldReaderUser, nameof(oldReaderUser));
+            Verify.IsNotNull(newReaderUser, nameof(newReaderUser));
+
             bool switchSuccessful = false;
             ulong oldReaderRoleId = 0;
             await this.DoReadWriteActionOnCurrentTournamentAsync(
@@ -659,12 +673,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private static string GetTextRoomName(Reader reader, int roundNumber)
         {
-            return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_")}";
+            return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_", StringComparison.InvariantCulture)}";
         }
 
         private static string GetVoiceRoomName(Reader reader)
         {
-            return $"{reader.Name.Replace(" ", "_")}'s_Voice_Channel";
+            return $"{reader.Name.Replace(" ", "_", StringComparison.InvariantCulture)}'s_Voice_Channel";
         }
 
         private async Task AddPermission(IGuildChannel channel, IRole role)
@@ -793,8 +807,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 string roleName = role.Name;
                 if (roleName == DirectorRoleName ||
-                    roleName.StartsWith(ReaderRoomRolePrefix) ||
-                    roleName.StartsWith(TeamRolePrefix))
+                    roleName.StartsWith(ReaderRoomRolePrefix, StringComparison.CurrentCulture) ||
+                    roleName.StartsWith(TeamRolePrefix, StringComparison.CurrentCulture))
                 {
                     deleteRoleTasks.Add(role.DeleteAsync(RequestOptionsSettings.Default));
                 }
@@ -823,7 +837,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             }
             else
             {
-                deleteChannelTasks = new Task[0];
+                deleteChannelTasks = Array.Empty<Task>();
             }
 
             // To prevent spamming Discord too much, delete all the channels, then delete the roles
@@ -840,7 +854,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 .Select(role => role.DeleteAsync(RequestOptionsSettings.Default));
             if (deleteRoleTasks == null)
             {
-                deleteRoleTasks = new Task[0];
+                deleteRoleTasks = Array.Empty<Task>();
             }
 
             this.Logger.Debug("Deleting all roles created by the tournament {name}", state.Name);

@@ -19,10 +19,12 @@ namespace QBDiscordAssistant.Tournament
 
         public Schedule Generate(IEnumerable<ISet<Team>> teams, ISet<Reader> readers)
         {
+            Verify.IsNotNull(teams, nameof(teams));
+            Verify.IsNotNull(readers, nameof(readers));
+
             if (this.roundRobins <= 0)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(this.roundRobins), TournamentStrings.RoundRobinsMustBePositive(this.roundRobins));
+                throw new InvalidOperationException(TournamentStrings.RoundRobinsMustBePositive(this.roundRobins));
             }
 
             int bracketsCount = teams.Count();
@@ -127,7 +129,7 @@ namespace QBDiscordAssistant.Tournament
 
             using (IEnumerator<Reader> readers = bracketReaders.AsEnumerable().GetEnumerator())
             {
-                this.GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow, bracket.HasBye);
+                GenerateGameForRound(round, readers, bracket.TopRow, bracket.BottomRow);
             }
         }
 
@@ -155,7 +157,7 @@ namespace QBDiscordAssistant.Tournament
                     bool hasBye = teamsInBracket.Count % 2 == 1;
                     int rounds = checked(this.roundRobins * (hasBye ? teamsInBracket.Count : teamsInBracket.Count - 1));
 
-                    this.GetInitialRows(teamsInBracket, out Team[] topRow, out Team[] bottomRow);
+                    GetInitialRows(teamsInBracket, out Team[] topRow, out Team[] bottomRow);
 
                     brackets.Add(new Bracket()
                     {
@@ -172,10 +174,9 @@ namespace QBDiscordAssistant.Tournament
             return brackets;
         }
 
-        private void GenerateGameForRound(
-            Round round, IEnumerator<Reader> readers, Team[] topRow, Team[] bottomRow, bool hasBye)
+        private static void GenerateGameForRound(
+            Round round, IEnumerator<Reader> readers, Team[] topRow, Team[] bottomRow)
         {
-            int gamesCount = hasBye ? topRow.Length - 1 : topRow.Length;
             for (int i = 0; i < topRow.Length; i++)
             {
                 Team firstTeam = topRow[i];
@@ -204,7 +205,7 @@ namespace QBDiscordAssistant.Tournament
             RotateCells(topRow, bottomRow);
         }
 
-        private void GetInitialRows(ISet<Team> teams, out Team[] topRow, out Team[] bottomRow)
+        private static void GetInitialRows(ISet<Team> teams, out Team[] topRow, out Team[] bottomRow)
         {
             // Generates a schedule using the Circle method. Initialize the two rows with the teams based on the order
             // they were created.

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace QBDiscordAssistant.Tournament
 {
@@ -6,11 +7,11 @@ namespace QBDiscordAssistant.Tournament
     {
         public Reader Reader { get; set; }
 
-        public Team[] Teams { get; set; }
+        public IEnumerable<Team> Teams { get; set; }
 
         public override string ToString()
         {
-            IEnumerable<Team> teams = this.Teams ?? new Team[0];
+            IEnumerable<Team> teams = this.Teams ?? Array.Empty<Team>();
             return $"Game between teams {string.Join(",", teams)} read by {this.Reader}";
         }
     }

@@ -56,7 +56,7 @@ namespace QBDiscordAssistantTests
         {
             RoundRobinScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(-1);
             CreateTeamsAndReaders(2, out ISet<Team> teams, out ISet<Reader> readers);
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => scheduleFactory.Generate(teams, new HashSet<Reader>()));
+            Assert.ThrowsException<InvalidOperationException>(() => scheduleFactory.Generate(teams, new HashSet<Reader>()));
         }
 
         [TestMethod]
@@ -72,7 +72,7 @@ namespace QBDiscordAssistantTests
         {
             RoundRobinScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(0);
             CreateTeamsAndReaders(2, out ISet<Team> teams, out ISet<Reader> readers);
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => scheduleFactory.Generate(teams, new HashSet<Reader>()));
+            Assert.ThrowsException<InvalidOperationException>(() => scheduleFactory.Generate(teams, new HashSet<Reader>()));
         }
 
         [TestMethod]
@@ -113,7 +113,7 @@ namespace QBDiscordAssistantTests
                 RoundRobinScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(i);
                 Schedule schedule = scheduleFactory.Generate(teams, readers);
                 int expectedNumberOfRounds = i * GetRoundCountInOneRoundRobin(teamsCount);
-                VerifySchedule(schedule, teams, readers, expectedNumberOfRounds);
+                VerifySchedule(schedule, teams, expectedNumberOfRounds);
             }
         }
 
@@ -143,12 +143,12 @@ namespace QBDiscordAssistantTests
                 RoundRobinScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(i);
                 Schedule schedule = scheduleFactory.Generate(teamsInBrackets, readers);
                 int expectedNumberOfRounds = i * GetRoundCountInOneRoundRobin(teamsInBrackets.Max(t => t.Count));
-                VerifyMultiBracketSchedule(schedule, teamsInBrackets, readers, i, expectedNumberOfRounds);
+                VerifyMultiBracketSchedule(schedule, teamsInBrackets, i, expectedNumberOfRounds);
             }
         }
 
         private static void VerifySchedule(
-            Schedule schedule, ISet<Team> teams, ISet<Reader> readers, int roundsCount)
+            Schedule schedule, ISet<Team> teams, int roundsCount)
         {
             Assert.AreEqual(
                 roundsCount, schedule.Rounds.Count, $"Unexpected number of rounds generated. ({teams.Count} teams)");
@@ -187,11 +187,7 @@ namespace QBDiscordAssistantTests
         }
 
         private static void VerifyMultiBracketSchedule(
-            Schedule schedule,
-            List<ISet<Team>> teamsInBrackets,
-            ISet<Reader> readers,
-            int roundRobinsCount,
-            int roundsCount)
+            Schedule schedule,  List<ISet<Team>> teamsInBrackets, int roundRobinsCount, int roundsCount)
         {
             Assert.AreEqual(
                 roundsCount,

@@ -10,7 +10,7 @@ using Serilog.Events;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
-    public class Bot : IDisposable
+    public sealed class Bot : IDisposable
     {
         public Bot(BotConfiguration configuration)
         {

@@ -7,7 +7,7 @@ namespace QBDiscordAssistant.Tournament
     // TODO: Find a way to persist this state on disk so that we can recover when the bot is closed/goes down.
     // If we want to do that we should take in an interface to persist this state, and add methods for adding/removing
     // tournaments.
-    public class TournamentsManager
+    public sealed class TournamentsManager : IDisposable
     {
         private const int mutexTimeoutMs = 60 * 1000; // 1 minute
 
@@ -26,6 +26,8 @@ namespace QBDiscordAssistant.Tournament
 
         public Result<T> TryReadActionOnCurrentTournament<T>(Func<IReadOnlyTournamentState, T> tournamentStateFunc)
         {
+            Verify.IsNotNull(tournamentStateFunc, nameof(tournamentStateFunc));
+
             if (!this.currentTournamentLock.TryEnterReadLock(mutexTimeoutMs))
             {
                 return Result<T>.CreateFailureResult(TournamentStrings.UnableAccessCurrentTournament);
@@ -59,6 +61,8 @@ namespace QBDiscordAssistant.Tournament
 
         public Result<T> TryReadWriteActionOnCurrentTournament<T>(Func<ITournamentState, T> tournamentStateTask)
         {
+            Verify.IsNotNull(tournamentStateTask, nameof(tournamentStateTask));
+
             if (!this.currentTournamentLock.TryEnterWriteLock(mutexTimeoutMs))
             {
                 return Result<T>.CreateFailureResult(TournamentStrings.UnableAccessCurrentTournament);
@@ -155,6 +159,11 @@ namespace QBDiscordAssistant.Tournament
             this.currentTournamentLock.ExitWriteLock();
 
             return true;
+        }
+
+        public void Dispose()
+        {
+            this.currentTournamentLock.Dispose();
         }
     }
 }

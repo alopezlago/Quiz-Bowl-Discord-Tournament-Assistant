@@ -355,6 +355,11 @@ namespace QBDiscordAssistantTests
 
         protected string GetMockEmbedText(IEmbed embed)
         {
+            if (embed == null)
+            {
+                throw new ArgumentNullException(nameof(embed));
+            }
+
             return this.GetMockEmbedText(
                 embed.Title, embed.Description, embed.Fields.ToDictionary(field => field.Name, field => field.Value));
         }

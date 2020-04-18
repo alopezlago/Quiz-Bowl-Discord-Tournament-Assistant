@@ -1,10 +1,15 @@
-﻿using System.Threading.Tasks;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     [RequireTournamentDirector]
+    [SuppressMessage(
+        "Design",
+        "CA1062:Validate arguments of public methods",
+        Justification = "Dependency injection will fail before null value passed in")]
     public class TournamentDirectorBotCommands : BotCommandsBase
     {
         public TournamentDirectorBotCommands(GlobalTournamentsManager globalManager)
