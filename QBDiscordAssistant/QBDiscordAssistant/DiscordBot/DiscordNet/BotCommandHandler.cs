@@ -896,7 +896,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 "Readers", options: RequestOptionsSettings.Default);
             foreach (Game game in firstRound.Games)
             {
-                createVoiceChannelsTasks.Add(this.CreateVoiceChannelAsync(voiceCategoryChannel, roles, game.Reader));
+                createVoiceChannelsTasks.Add(this.CreateVoiceChannelAsync(voiceCategoryChannel, game.Reader));
             }
 
             IVoiceChannel[] voiceChannels = await Task.WhenAll(createVoiceChannelsTasks);
@@ -994,8 +994,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return channel;
         }
 
-        private async Task<IVoiceChannel> CreateVoiceChannelAsync(
-            ICategoryChannel parent, TournamentRoles roles, Reader reader)
+        private async Task<IVoiceChannel> CreateVoiceChannelAsync(ICategoryChannel parent, Reader reader)
         {
             this.Logger.Debug("Creating voice channel for reader {id}", reader.Id);
             string name = GetVoiceRoomName(reader);
