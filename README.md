@@ -16,7 +16,7 @@ If you decide to host it locally, then do the following:
 1. Install [.Net Core Runtime 3.1](https://dotnet.microsoft.com/download/dotnet-core/3.1)  
 2. Unzip the release
 3. Go to https://discordapp.com/developers to register your instance of the bot
-    - Update token.txt with the client secret from your registered Discord bot
+    - Update discordToken.txt with the client secret from your registered Discord bot
     - Visit this site (with your bot's client ID) to add the bot to your channel
       - https://discordapp.com/oauth2/authorize?client_id=CLIENTID&scope=bot
 4. Run the .exe file
