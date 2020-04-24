@@ -5,7 +5,6 @@ using Discord.Commands;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
-    [RequireOwner]
     [RequireUserPermission(GuildPermission.Administrator)]
     [SuppressMessage(
         "Design",
