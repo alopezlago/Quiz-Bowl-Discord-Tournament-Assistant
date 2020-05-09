@@ -1,4 +1,6 @@
-﻿using QBDiscordAssistant.Tournament;
+﻿using System.Collections;
+using System.Collections.Generic;
+using QBDiscordAssistant.Tournament;
 
 namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
@@ -21,6 +23,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public const string NumberOfTeamsMustBeGreaterThanZero = "Number of teams must be greater than 0.";
         public const string ReaderCannotJoinAsPlayer = "A reader cannot join as a player.";
         public const string ReadersSwitchedSuccessfully = "Readers switched successfully.";
+        public const string Schedule = "Schedule";
         public const string TournamentDirectorCannotJoinAsPlayer = "A tournament director cannot join as a player.";
         public const string TournamentWasNotRemoved = "Tournament was not removed from the list of pending tournaments. Try the command again.";
         public const string UnknownErrorRemovingOldReader = "Unknown error when trying to remove the old reader.";
@@ -120,9 +123,19 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return $"Removed tournament director from tournament '{tournamentName}' in guild '{guildName}'.";
         }
 
+        public static string RoundNumber(int number)
+        {
+            return $"Round {number}";
+        }
+
         public static string TeamDoesNotExist(string teamName)
         {
             return $"Team '{teamName}' does not exist.";
+        }
+
+        public static string ScheduleLine(string readerName, string[] teamNames)
+        {
+            return $"{string.Join(" vs ", teamNames)} <{readerName}>";
         }
 
         public static string TooManyTeams(int maximumTeamCount)

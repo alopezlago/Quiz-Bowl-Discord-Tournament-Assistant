@@ -17,8 +17,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
         }
 
-        private BotCommandHandler CommandHandler { get; }
-
         [Command("addTD")]
         [Summary("Adds a tournament director to a tournament, and creates that tournament if it doesn't exist yet.")]
         public Task AddTournamentDirector(
