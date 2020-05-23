@@ -57,7 +57,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             this.GlobalManager = globalManager;
             this.Logger = Log
                 .ForContext<BotCommandHandler>()
-                .ForContext("guildId", this.Context.Guild.Id);
+                .ForContext("guildId", this.Context.Guild?.Id);
         }
 
         private ICommandContext Context { get; }
@@ -410,6 +410,48 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             string content = string.Join(Environment.NewLine, teamPlayerLines);
             await this.SendUserMessageAsync(content);
             this.Logger.Debug("Current players returned successfully");
+        }
+
+        public async Task GetScheduleAsync(string teamName = null)
+        {
+            // We may also want to expand schedule, so you show it just for a team, or for a particular round
+            await this.DoReadActionOnCurrentTournamentAsync(
+                currentTournament =>
+                {
+                    Team team = teamName == null ?
+                        null :
+                        new Team()
+                        {
+                            Name = teamName
+                        };
+
+                    // TODO: Need to do more investigation on if this should be sent to the channel or to the user.
+                    return this.Context.Channel.SendAllEmbeds(
+                        currentTournament.Schedule.Rounds,
+                        () => new EmbedBuilder()
+                        {
+                            Title = BotStrings.Schedule
+                        },
+                        (round, roundIndex) =>
+                        {
+                            EmbedFieldBuilder fieldBuilder = new EmbedFieldBuilder();
+                            fieldBuilder.Name = BotStrings.RoundNumber(roundIndex + 1);
+                            IEnumerable<Game> games = round.Games
+                                .Where(game => game.Teams != null && game.Reader != null);
+                            if (team != null)
+                            {
+                                games = games.Where(game => game.Teams.Contains(team));
+                            }
+
+                            IEnumerable<string> lines = games
+                                .Select(game => BotStrings.ScheduleLine(
+                                    game.Reader.Name,  game.Teams.Select(team => team.Name).ToArray()));
+
+                            fieldBuilder.Value = string.Join("\n", lines);
+                            return fieldBuilder;
+                        });
+                }
+            );
         }
 
         public async Task RemovePlayerAsync(IGuildUser user)

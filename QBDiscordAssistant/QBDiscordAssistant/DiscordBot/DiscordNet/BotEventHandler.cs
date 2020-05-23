@@ -14,8 +14,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     public sealed class BotEventHandler : IDisposable
     {
-        private const int MaxTeamsInMessage = 20;
-
         // TODO: Add wrapper class/interface for the client to let us test the event handlers.
         // The events themselves pass in SocketMessages, so perhaps grab some fields and abstract the logic. Let's do a
         // straight transfer first.
@@ -499,7 +497,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await this.UpdateStage(currentTournament, TournamentStage.AddPlayers, message.Channel);
 
             currentTournament.ClearSymbolsToTeam();
-            int emojiIndex = 0;
             Debug.Assert(
                 emotes.Length == teamsCount,
                 $"Teams ({teamsCount}) and emojis ({emotes.Length}) lengths are unequal.");
@@ -508,37 +505,43 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             // They are 25 and 20, respectively. Limit the number of teams per message to this limit.
             // maxFieldSize is an inclusive limit, so we need to include the - 1 to make add a new slot only
             // when that limit is exceeded.
-            int addPlayersEmbedsCount = 1 + (teamsCount - 1) / MaxTeamsInMessage;
-            IEnumerator<Team> teamsEnumerator = currentTournament.Teams.GetEnumerator();
+
             List<Task> addReactionsTasks = new List<Task>();
-            for (int i = 0; i < addPlayersEmbedsCount; i++)
-            {
-                EmbedBuilder embedBuilder = new EmbedBuilder
+            int emojiIndexForFields = 0;
+            int emojiIndexForMessages = 0;
+
+            await message.Channel.SendAllEmbeds(
+                currentTournament.Teams,
+                () => new EmbedBuilder
                 {
                     Title = BotStrings.JoinTeams,
                     Description = BotStrings.ClickOnReactionsJoinTeam
-                };
-                int fieldCount = 0;
-                List<IEmote> emotesForMessage = new List<IEmote>();
-                while (fieldCount < MaxTeamsInMessage && teamsEnumerator.MoveNext())
+                },
+                (team, teamIndex) =>
                 {
-                    IEmote emote = emotes[emojiIndex];
-                    emotesForMessage.Add(emote);
-                    Team team = teamsEnumerator.Current;
-                    embedBuilder.AddField(emote.Name, team.Name);
+                    IEmote emote = emotes[emojiIndexForFields];
+                    emojiIndexForFields++;
+
                     currentTournament.AddSymbolToTeam(emote.Name, team);
 
-                    fieldCount++;
-                    emojiIndex++;
-                }
+                    return new EmbedFieldBuilder()
+                    {
+                        Name = emote.Name,
+                        Value = team.Name
+                    };
+                },
+                (userMessage, embed) =>
+                {
+                    IEmote[] messageEmotes = new IEmote[embed.Fields.Length];
+                    for (int i = 0; i < messageEmotes.Length; i++)
+                    {
+                        messageEmotes[i] = emotes[emojiIndexForMessages];
+                        emojiIndexForMessages++;
+                    }
 
-                // We should generally avoid await inside of loops, but we want the messages and emojis to be
-                // in order.
-                IUserMessage newMessage = await message.Channel.SendMessageAsync(
-                    embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
-                currentTournament.AddJoinTeamMessageId(newMessage.Id);
-                addReactionsTasks.Add(AddReactionsToMessage(newMessage, emotesForMessage, currentTournament));
-            }
+                    currentTournament.AddJoinTeamMessageId(userMessage.Id);
+                    addReactionsTasks.Add(AddReactionsToMessage(userMessage, messageEmotes, currentTournament));
+                });
 
             await Task.WhenAll(addReactionsTasks);
             this.Logger.Debug("All reactions added for add players stage");
