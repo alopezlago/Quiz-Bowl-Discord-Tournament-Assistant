@@ -43,7 +43,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 .ForContext<BotCommandHandler>()
                 .ForContext("guildId", this.Context.Guild?.Id);
         }
-        
+
         private ITournamentChannelManager ChannelManager { get; }
 
         private ICommandContext Context { get; }
@@ -169,6 +169,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return this.DoReadWriteActionOnCurrentTournamentAsync(
                 async currentTournament =>
                 {
+                    bool sendMessage = true;
                     switch (currentTournament.Stage)
                     {
                         case TournamentStage.SetRoundRobins:
@@ -193,6 +194,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                             currentTournament.ClearJoinTeamMessageIds();
                             break;
+                        case TournamentStage.Rebracketing:
+                            // Don't send the message about the tournament starting again
+                            sendMessage = false;
+                            break;
                         default:
                             // Nothing to go back to, so do nothing.
                             this.Logger.Debug("Could not go back on stage {stage}", currentTournament.Stage);
@@ -200,8 +205,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             return;
                     }
 
-                    TournamentStage previousStage = currentTournament.Stage - 1;
-                    await this.UpdateStageAsync(currentTournament, previousStage);
+                    TournamentStage previousStage = currentTournament.Stage == TournamentStage.Finals ?
+                        TournamentStage.RunningTournament :
+                        currentTournament.Stage - 1;
+                    await this.UpdateStageAsync(currentTournament, previousStage, sendMessage);
                 });
         }
 
@@ -413,7 +420,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
                             IEnumerable<string> lines = games
                                 .Select(game => BotStrings.ScheduleLine(
-                                    game.Reader.Name,  game.Teams.Select(team => team.Name).ToArray()));
+                                    game.Reader.Name, game.Teams.Select(team => team.Name).ToArray()));
 
                             fieldBuilder.Value = string.Join("\n", lines);
                             return fieldBuilder;
@@ -928,7 +935,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
         }
 
-        private async Task UpdateStageAsync(ITournamentState state, TournamentStage stage)
+        private async Task UpdateStageAsync(ITournamentState state, TournamentStage stage, bool sendMessage = true)
         {
             state.UpdateStage(stage, out string title, out string instructions);
             if (title == null && instructions == null)
@@ -936,12 +943,17 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            EmbedBuilder embedBuilder = new EmbedBuilder
+            if (sendMessage)
             {
-                Title = title,
-                Description = instructions
-            };
-            await this.Context.Channel.SendMessageAsync(embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
+                EmbedBuilder embedBuilder = new EmbedBuilder
+                {
+                    Title = title,
+                    Description = instructions
+                };
+                await this.Context.Channel.SendMessageAsync(
+                    embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
+            }
+
             this.Logger.Debug("Moved to stage {stage}", stage);
         }
     }

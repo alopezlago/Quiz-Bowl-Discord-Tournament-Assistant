@@ -555,22 +555,23 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 return;
             }
 
-            IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(
-                currentTournament.RoundRobinsCount);
+            // TODO: Figure out if we want the number of round robins in the rebracket to be specified. Generally for
+            // a rebracketed bracket, it's 1
+            IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(roundRobins: 1);
 
-            Schedule schedule = scheduleFactory.Generate(
+            Schedule bracketSchedule = scheduleFactory.Generate(
                 new HashSet<Team>(teams),
                 new HashSet<Reader>(currentTournament.Readers));
 
-            int oldRoundCount = schedule.Rounds.Count;
-            foreach (Round round in schedule.Rounds)
+            int oldRoundCount = currentTournament.Schedule.Rounds.Count;
+            foreach (Round round in bracketSchedule.Rounds)
             {
                 currentTournament.Schedule.AddRound(round);
             }
 
             ITournamentChannelManager channelManager = new TournamentChannelManager(guild);
             await channelManager.CreateChannelsForRebracket(
-                this.Client.CurrentUser, currentTournament, schedule.Rounds, oldRoundCount + 1);
+                this.Client.CurrentUser, currentTournament, bracketSchedule.Rounds, oldRoundCount + 1);
 
             await this.UpdateStage(currentTournament, TournamentStage.RunningTournament, message.Channel);
         }

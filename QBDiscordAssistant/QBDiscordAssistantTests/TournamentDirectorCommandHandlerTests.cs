@@ -311,6 +311,28 @@ namespace QBDiscordAssistantTests
         }
 
         [TestMethod]
+        public async Task BackOnRebracketingSucceeds()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            state.UpdateStage(TournamentStage.Rebracketing, out _, out _);
+            Assert.AreEqual(
+                TournamentStage.Rebracketing, state.Stage, "Stage didn't go to rebracketing");
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(
+                TournamentStage.RunningTournament,
+                state.Stage,
+                "Stage didn't go back to adding teams");
+            Assert.AreEqual(0, messageStore.DirectMessages.Count, "No direct messages should've been sent");
+            Assert.AreEqual(0, messageStore.ChannelEmbeds.Count, "No channel embeds should've been sent");
+        }
+
+        [TestMethod]
         public async Task BackSucceeds()
         {
             this.InitializeWithCurrentTournament(
