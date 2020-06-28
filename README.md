@@ -66,7 +66,7 @@ The bot needs to have all of these permissions (give it a role), because it need
 
   5. Add all of the teams in the tournament
 
-    Team 1, Team 2, Team 3
+    Team 1, Team 2, Team 3, Team 4
 
   6. The bot will send out a message or two telling players which reaction to click to join their team.
 
@@ -75,11 +75,21 @@ The bot needs to have all of these permissions (give it a role), because it need
     !start
 
   8. The bot will create the text and voice channels for everyone, and assign permissions for these rooms. It will tell you when this is completed.
-  9. If you need to set up a finals room, then the tournament director should use the !finals command.
+  
+  9. If you need to rebracket, then the tournament director should use the !rebracket command. When the bot asks you for the teams, give them in the same way that they were initially, with teams in the same bracket belonging to the same line.
+  
+    !rebracket
+
+    <after the bot asks you for the brackets>
+     
+    Team 1, Team 4
+    Team 2, Team 3
+  
+  10. If you need to set up a finals room, then the tournament director should use the !finals command.
 
     !finals @Reader Team1, Team2
 
-  10. To end the tournament, the tournament director uses !end
+  11. To end the tournament, the tournament director uses !end
 
     !end
 
@@ -88,8 +98,15 @@ Note: if your tournament has different brackets, then put each team in the same 
     X, Y
     Alpha, Omega
 
+Note: you can find all of the commands that the bot supports by direct messaging it this command
+
+    !help
 
 ### Development
+
+To build the bot, download the .Net Core SDK (at least version 3.1), and then run
+
+    dotnet build
 
 #### Requirements
 
