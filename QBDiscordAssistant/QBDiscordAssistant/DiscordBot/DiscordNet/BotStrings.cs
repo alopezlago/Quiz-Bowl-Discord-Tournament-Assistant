@@ -8,12 +8,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
     {
         public const string AllReaderNamesShouldBeUnique = "All reader names should be unique.";
         public const string BotCannotJoinAsPlayer = "Bot cannot join as a player.";
+        public const string CanOnlyRebracketWhileRunning = "Can only rebracket while the tournament is running and the finals room isn't set up.";
         public const string ClickOnReactionsJoinTeam = "Click on the reactions corresponding to your team to join it. Click on the reaction again to leave that team.";
         public const string CommandOnlyUsedTournamentReadyStart = "This command can only be used when a tournament is ready to start, which is after all the players have joined their teams.";
         public const string CommandOnlyUsedWhileTournamentRunning = "This command can only be used while the tournament is running. Use !back if you are still setting up the tournament.";
         public const string CouldntGetRoleForTheOldReader = "Couldn't get the role for the old reader. Readers were not switched. You may need to manually switch the roles.";
         public const string CreatingChannelsAndRoles = "Creating the channels and roles...";
-        public const string ErrorFinalsOnlySetDuringPrelims = "Error: finals can only be set during the prelims.";
+        public const string ErrorFinalsOnlySetDuringPrelimsOrPlayoffs = "Error: finals can only be set during the tournament (prelims or playoffs).";
         public const string ErrorGivenUserIsntAReader = "Error: given user isn't a reader.";
         public const string ErrorNoTeamsSpecified = "Error: No teams specified.";
         public const string JoinTeams = "Join Teams";
@@ -46,6 +47,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public static string CannotGoBack(TournamentStage stage)
         {
             return $"Cannot go back from the stage {stage}.";
+        }
+
+        public static string CannotNewTeamsAddDuringRebracket(IEnumerable<string> teamNames)
+        {
+            string newTeams = string.Join(", ", teamNames);
+            return $"Cannot add new teams during a rebracket. Please re-enter the brackets. Teams added: {newTeams}";
         }
 
         public static string CurrentTournamentInGuild(string guildName, string tournamentName)

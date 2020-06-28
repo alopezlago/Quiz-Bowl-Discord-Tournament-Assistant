@@ -8,7 +8,8 @@
         AddTeams,
         AddPlayers,
         BotSetup,
-        RunningPrelims,
+        RunningTournament,
+        Rebracketing,
         Finals,
         Complete
     }

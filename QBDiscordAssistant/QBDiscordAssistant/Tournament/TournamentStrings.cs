@@ -1,4 +1,7 @@
-﻿namespace QBDiscordAssistant.Tournament
+﻿using System.Collections;
+using System.Collections.Generic;
+
+namespace QBDiscordAssistant.Tournament
 {
     public static class TournamentStrings
     {
@@ -9,6 +12,8 @@
         public const string MustHaveMoreThanOneTeamPerBracket = "Must have more than 1 team per bracket.";
         public const string MustHaveReader = "Must have a reader.";
         public const string NoCurrentTournamentRunning = "No current tournament is running.";
+        public const string Rebracket = "Rebracket";
+        public const string RebracketInstructions = "To rebracket, add a list of comma-separated team names.Different brackets should be in different lines(you can send messages with multiple lines using Shift+Enter). Put the teams in the same bracket on the same own line.If the team name has a comma, use another comma to escape it (like,,).";
         public const string SetNumberRoundRobins = "Set the number of round robins.";
         public const string SettingUpTournament = "Setting up the tournament.";
         public const string TournamentCompleted = "Tournament Completed.";
@@ -17,7 +22,7 @@
 
         public static string AddListCommaSeparatedTeams(int teamsCount)
         {
-            return $"Add a list of comma-separated team names. For multiple brackets, put the same teams on its own line. If the team name has a comma, use another comma to escape it (like ,,). You can add a maximum of {teamsCount} teams.";
+            return $"Add a list of comma-separated team names. For multiple brackets, put the same teams on its own line (you can send messages with multiple lines using Shift+Enter). If the team name has a comma, use another comma to escape it (like ,,). You can add a maximum of {teamsCount} teams.";
         }
 
         public static string AllTournamentChannelsRolesRemoved(string tournamentName)

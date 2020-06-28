@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -31,34 +30,21 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             deafenMembers: true,
             readMessageHistory: true,
             viewChannel: true);
-        internal static readonly OverwritePermissions PrivilegedOverwritePermissions = new OverwritePermissions(
-            speak: PermValue.Allow,
-            sendMessages: PermValue.Allow,
-            muteMembers: PermValue.Allow,
-            deafenMembers: PermValue.Allow,
-            readMessageHistory: PermValue.Allow,
-            viewChannel: PermValue.Allow,
-            moveMembers: PermValue.Allow);
-        internal static readonly OverwritePermissions EveryonePermissions = new OverwritePermissions(
-            viewChannel: PermValue.Deny,
-            sendMessages: PermValue.Deny,
-            readMessageHistory: PermValue.Deny);
-        internal static readonly OverwritePermissions TeamPermissions = new OverwritePermissions(
-            viewChannel: PermValue.Allow,
-            sendMessages: PermValue.Allow,
-            readMessageHistory: PermValue.Allow);
 
         public BotCommandHandler(ICommandContext context, GlobalTournamentsManager globalManager)
         {
             Verify.IsNotNull(context, nameof(context));
             Verify.IsNotNull(globalManager, nameof(globalManager));
 
+            this.ChannelManager = new TournamentChannelManager(context.Guild);
             this.Context = context;
             this.GlobalManager = globalManager;
             this.Logger = Log
                 .ForContext<BotCommandHandler>()
                 .ForContext("guildId", this.Context.Guild?.Id);
         }
+        
+        private ITournamentChannelManager ChannelManager { get; }
 
         private ICommandContext Context { get; }
 
@@ -249,10 +235,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await this.DoReadWriteActionOnCurrentTournamentAsync(
                 async currentTournament =>
                 {
-                    if (currentTournament?.Stage != TournamentStage.RunningPrelims)
+                    if (currentTournament?.Stage != TournamentStage.RunningTournament)
                     {
                         this.Logger.Debug("Could not start finals in stage {stage}", currentTournament?.Stage);
-                        await this.SendUserMessageAsync(BotStrings.ErrorFinalsOnlySetDuringPrelims);
+                        await this.SendUserMessageAsync(BotStrings.ErrorFinalsOnlySetDuringPrelimsOrPlayoffs);
                         return;
                     }
 
@@ -330,30 +316,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         roomIndex = 0;
                     }
 
-                    // TODO: We should split up this method.
-                    IRole directorRole = this.Context.Guild.GetRole(currentTournament.TournamentRoles.DirectorRoleId);
-                    Dictionary<Reader, IRole> roomReaderRoles = currentTournament.TournamentRoles.ReaderRoomRoleIds
-                        .ToDictionary(kvp => kvp.Key, kvp => this.Context.Guild.GetRole(kvp.Value));
-                    Dictionary<Team, IRole> teamRoles = currentTournament.TournamentRoles.TeamRoleIds
-                        .ToDictionary(kvp => kvp.Key, kvp => this.Context.Guild.GetRole(kvp.Value));
-
-                    TournamentRoles tournamentRoles = new TournamentRoles()
-                    {
-                        DirectorRole = directorRole,
-                        RoomReaderRoles = roomReaderRoles,
-                        TeamRoles = teamRoles
-                    };
-
                     // TODO: Look into creating the channels after the update stage so we can release the lock
                     // sooner. However, this does mean that a failure to create channels will leave us in a bad 
                     // state.
-                    ICategoryChannel finalsCategoryChannel = await this.Context.Guild.CreateCategoryAsync($"Finals");
-                    channel = await this.CreateTextChannelAsync(
-                        finalsCategoryChannel,
-                        finalsGame,
-                        tournamentRoles,
-                        finalsRoundNumber,
-                        roomIndex);
+                    channel = await this.ChannelManager.CreateChannelsForFinals(
+                        this.Context.Client.CurrentUser, currentTournament, finalsGame, finalsRoundNumber, roomIndex);
+
                     currentTournament.UpdateStage(
                         TournamentStage.Finals, out string nextStageTitle, out string nextStageInstructions);
                 });
@@ -452,6 +420,20 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         });
                 }
             );
+        }
+
+        public Task RebracketAsync()
+        {
+            return this.DoReadWriteActionOnCurrentTournamentAsync(
+                currentTournament =>
+                {
+                    if (currentTournament.Stage != TournamentStage.RunningTournament)
+                    {
+                        return this.Context.User.SendMessageAsync(BotStrings.CanOnlyRebracketWhileRunning);
+                    }
+
+                    return this.UpdateStageAsync(currentTournament, TournamentStage.Rebracketing);
+                });
         }
 
         public async Task RemovePlayerAsync(IGuildUser user)
@@ -600,7 +582,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             BotStrings.CreatingChannelsAndRoles, options: RequestOptionsSettings.Default);
                         await this.CreateArtifactsAsync(currentTournament);
 
-                        await this.UpdateStageAsync(currentTournament, TournamentStage.RunningPrelims);
+                        await this.UpdateStageAsync(currentTournament, TournamentStage.RunningTournament);
                         startSucceeded = true;
                     }
                     catch (Exception ex)
@@ -711,23 +693,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         private static string GetRoomReaderRoleName(int roomNumber)
         {
             return $"{ReaderRoomRolePrefix}{roomNumber + 1}";
-        }
-
-        private static string GetTextRoomName(Reader reader, int roundNumber)
-        {
-            return $"Round_{roundNumber}_{reader.Name.Replace(" ", "_", StringComparison.InvariantCulture)}";
-        }
-
-        private static string GetVoiceRoomName(Reader reader)
-        {
-            return $"{reader.Name.Replace(" ", "_", StringComparison.InvariantCulture)}'s_Voice_Channel";
-        }
-
-        private async Task AddPermission(IGuildChannel channel, IRole role)
-        {
-            this.Logger.Debug("Adding role {0} to channel {1}", role.Id, channel.Id);
-            await channel.AddPermissionOverwriteAsync(role, TeamPermissions, RequestOptionsSettings.Default);
-            this.Logger.Debug("Added role {0} to channel {1}", role.Id, channel.Id);
         }
 
         private async Task<Dictionary<Team, IRole>> AssignPlayerRolesAsync(
@@ -927,51 +892,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             };
             state.TournamentRoles = roles.ToIds();
 
-            // Create the voice channels
-            List<Task<IVoiceChannel>> createVoiceChannelsTasks = new List<Task<IVoiceChannel>>();
-            // We only need to go through the games for the first round to get all of the readers.
-            Round firstRound = state.Schedule.Rounds.First();
-            Debug.Assert(firstRound.Games.Select(game => game.Reader.Name).Count() ==
-                firstRound.Games.Select(game => game.Reader.Name).Distinct().Count(),
-                "All reader names should be unique.");
-            ICategoryChannel voiceCategoryChannel = await this.Context.Guild.CreateCategoryAsync(
-                "Readers", options: RequestOptionsSettings.Default);
-            foreach (Game game in firstRound.Games)
-            {
-                createVoiceChannelsTasks.Add(this.CreateVoiceChannelAsync(voiceCategoryChannel, game.Reader));
-            }
-
-            IVoiceChannel[] voiceChannels = await Task.WhenAll(createVoiceChannelsTasks);
-
-            // Create the text channels
-            List<Task<ITextChannel>> createTextChannelsTasks = new List<Task<ITextChannel>>();
-            List<Func<Task<ITextChannel>>> createTextChannelTasks2 = new List<Func<Task<ITextChannel>>>();
-            List<ulong> textCategoryChannelIds = new List<ulong>();
-            int roundNumber = 1;
-            foreach (Round round in state.Schedule.Rounds)
-            {
-                int roomNumber = 0;
-                ICategoryChannel roundCategoryChannel = await this.Context.Guild.CreateCategoryAsync(
-                    $"Round {roundNumber}",
-                    options: RequestOptionsSettings.Default);
-                textCategoryChannelIds.Add(roundCategoryChannel.Id);
-
-                foreach (Game game in round.Games)
-                {
-                    createTextChannelsTasks.Add(
-                        this.CreateTextChannelAsync(roundCategoryChannel, game, roles, roundNumber, roomNumber));
-                    roomNumber++;
-                }
-
-                roundNumber++;
-            }
-
-            ITextChannel[] textChannels = await Task.WhenAll(createTextChannelsTasks);
-            state.ChannelIds = voiceChannels.Select(channel => channel.Id)
-                .Concat(textChannels.Select(channel => channel.Id))
-                .Concat(new ulong[] { voiceCategoryChannel.Id })
-                .Concat(textCategoryChannelIds)
-                .ToArray();
+            await this.ChannelManager.CreateChannelsForPrelims(this.Context.Client.CurrentUser, state, roles);
         }
 
         private async Task<KeyValuePair<Team, IRole>> CreateTeamRoleAsync(Team team)
@@ -979,76 +900,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             IRole role = await this.Context.Guild.CreateRoleAsync(
                 GetTeamRoleName(team), color: Color.Teal, options: RequestOptionsSettings.Default);
             return new KeyValuePair<Team, IRole>(team, role);
-        }
-
-        private async Task<ITextChannel> CreateTextChannelAsync(
-            ICategoryChannel parent, Game game, TournamentRoles roles, int roundNumber, int roomNumber)
-        {
-            // The room and role names will be the same.
-            this.Logger.Debug("Creating text channel for room {0} in round {1}", roomNumber, roundNumber);
-            string name = GetTextRoomName(game.Reader, roundNumber);
-            ITextChannel channel = await this.Context.Guild.CreateTextChannelAsync(
-                name,
-                channelProps =>
-                {
-                    channelProps.CategoryId = parent.Id;
-                },
-                RequestOptionsSettings.Default);
-            this.Logger.Debug("Text channel for room {0} in round {1} created", roomNumber, roundNumber);
-
-            // We need to add the bot's permissions first before we disable permissions for everyone.
-            await channel.AddPermissionOverwriteAsync(
-                this.Context.Client.CurrentUser, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
-
-            this.Logger.Debug("Adding permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
-            await channel.AddPermissionOverwriteAsync(
-                this.Context.Guild.EveryoneRole, EveryonePermissions, RequestOptionsSettings.Default);
-            await channel.AddPermissionOverwriteAsync(
-                roles.DirectorRole, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
-
-            if (roles.RoomReaderRoles.TryGetValue(game.Reader, out IRole readerRole))
-            {
-                await channel.AddPermissionOverwriteAsync(
-                    readerRole, PrivilegedOverwritePermissions, RequestOptionsSettings.Default);
-            }
-            else
-            {
-                this.Logger.Warning("Could not find a reader role for a reader with ID {0}.", game.Reader?.Id);
-            }
-
-            List<Task> addTeamRolesToChannel = new List<Task>();
-            foreach (Team team in game.Teams)
-            {
-                if (!roles.TeamRoles.TryGetValue(team, out IRole role))
-                {
-                    this.Logger.Warning("Team {name} did not have a role defined.", team.Name);
-                    continue;
-                }
-
-                // TODO: Investigate if it's possible to parallelize this. Other attempts to do so (Task.WhenAll,
-                // AsyncEnumerable's ParallelForEachAsync) have had bugs where roles sometimes aren't assigned to a
-                // channel. Adding an await in the loop seems to be the only thing that 
-                await this.AddPermission(channel, role);
-            }
-
-            await Task.WhenAll(addTeamRolesToChannel);
-            this.Logger.Debug("Added permissions to text channel for room {0} in round {1}", roomNumber, roundNumber);
-            return channel;
-        }
-
-        private async Task<IVoiceChannel> CreateVoiceChannelAsync(ICategoryChannel parent, Reader reader)
-        {
-            this.Logger.Debug("Creating voice channel for reader {id}", reader.Id);
-            string name = GetVoiceRoomName(reader);
-            IVoiceChannel channel = await this.Context.Guild.CreateVoiceChannelAsync(
-                name,
-                channelProps =>
-                {
-                    channelProps.CategoryId = parent.Id;
-                },
-                RequestOptionsSettings.Default);
-            this.Logger.Debug("Voice channel for reader {id} created", reader.Id);
-            return channel;
         }
 
         private Task DoReadActionOnCurrentTournamentAsync(Func<IReadOnlyTournamentState, Task> action)
@@ -1092,23 +943,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             };
             await this.Context.Channel.SendMessageAsync(embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
             this.Logger.Debug("Moved to stage {stage}", stage);
-        }
-
-        private class TournamentRoles
-        {
-            public IRole DirectorRole { get; set; }
-
-            public IDictionary<Reader, IRole> RoomReaderRoles { get; set; }
-
-            public Dictionary<Team, IRole> TeamRoles { get; set; }
-
-            public TournamentRoleIds ToIds()
-            {
-                return new TournamentRoleIds(
-                    this.DirectorRole.Id,
-                    this.RoomReaderRoles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Id),
-                    this.TeamRoles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Id));
-            }
         }
     }
 }

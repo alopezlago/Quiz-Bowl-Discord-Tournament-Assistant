@@ -219,9 +219,13 @@ namespace QBDiscordAssistant.Tournament
                     nextStageTitle = TournamentStrings.SettingUpTournament;
                     nextStageInstructions = TournamentStrings.InitializingSchedule;
                     break;
-                case TournamentStage.RunningPrelims:
+                case TournamentStage.RunningTournament:
                     nextStageTitle = TournamentStrings.TournamentStarted;
                     nextStageInstructions = TournamentStrings.TournamentStartedDirections(this.Name);
+                    break;
+                case TournamentStage.Rebracketing:
+                    nextStageTitle = TournamentStrings.Rebracket;
+                    nextStageInstructions = TournamentStrings.RebracketInstructions;
                     break;
                 case TournamentStage.Complete:
                     nextStageTitle = TournamentStrings.TournamentCompleted;
