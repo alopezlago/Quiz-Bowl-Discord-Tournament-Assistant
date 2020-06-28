@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <PackageId>Quiz Bowl Discord Tournament Assistant</PackageId>
-    <Version>0.1.2.0</Version>
+    <Version>0.1.3.0</Version>
     <Authors>Alejandro Lopez-Lago</Authors>
     <Product>Quiz Bowl Discord Tournament Assistant</Product>
     <Copyright>2020 (c) Alejandro Lopez-Lago</Copyright>

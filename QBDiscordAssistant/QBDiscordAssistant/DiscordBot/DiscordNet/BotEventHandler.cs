@@ -121,6 +121,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         case TournamentStage.AddTeams:
                             await this.HandleAddTeamsStage(currentTournament, message);
                             break;
+                        case TournamentStage.Rebracketing:
+                            await this.HandleRebracketingStage(currentTournament, guildChannel.Guild, message);
+                            break;
                         default:
                             this.Logger.Verbose(
                                 "Message ignored because it is during the stage {stage}", currentTournament.Stage);
@@ -439,27 +442,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         // TODO: Make string message and IGuildChannel?
         private async Task HandleAddTeamsStage(ITournamentState currentTournament, SocketMessage message)
         {
-            // We don't use Environment.NewLine because we only need a plain newline, even in Windows (shift+Enter)
-            string[] teamsList = message.Content.Split("\n");
-            List<Team> teams = new List<Team>();
-            string errorMessage;
-            for (int i = 0; i < teamsList.Length; i++)
+            if (!TeamsParser.TryParseTeams(message.Content, out IEnumerable<Team> teams, out string errorMessage))
             {
-                string teamList = teamsList[i];
-                if (!TeamNameParser.TryGetTeamNamesFromParts(
-                    teamList, out IList<string> newTeamNames, out errorMessage))
-                {
-                    await message.Channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
-                    this.Logger.Debug("Team names could not be parsed. Error message: {errorMessage}", errorMessage);
-                    return;
-                }
-
-                teams.AddRange(newTeamNames.Select(teamName =>
-                    new Team()
-                    {
-                        Name = teamName,
-                        Bracket = i
-                    }));
+                await message.Channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
+                this.Logger.Debug("Team names could not be parsed. Error message: {errorMessage}", errorMessage);
+                return;
             }
 
             currentTournament.AddTeams(teams);
@@ -545,6 +532,48 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             await Task.WhenAll(addReactionsTasks);
             this.Logger.Debug("All reactions added for add players stage");
+        }
+
+        private async Task HandleRebracketingStage(
+            ITournamentState currentTournament, IGuild guild, SocketMessage message)
+        {
+            if (!TeamsParser.TryParseTeams(message.Content, out IEnumerable<Team> teams, out string errorMessage))
+            {
+                await message.Channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
+                this.Logger.Debug("Team names could not be parsed. Error message: {errorMessage}", errorMessage);
+                return;
+            }
+
+            // There should be no new teams in the rebracket, although teams can drop out
+            IEnumerable<Team> newTeams = teams.Except(currentTournament.Teams);
+            if (newTeams.Any())
+            {
+                IEnumerable<string> newTeamNames = newTeams.Select(team => team.Name);
+                await message.Channel.SendMessageAsync(
+                    BotStrings.CannotNewTeamsAddDuringRebracket(newTeamNames),
+                    options: RequestOptionsSettings.Default);
+                return;
+            }
+
+            // TODO: Figure out if we want the number of round robins in the rebracket to be specified. Generally for
+            // a rebracketed bracket, it's 1
+            IScheduleFactory scheduleFactory = new RoundRobinScheduleFactory(roundRobins: 1);
+
+            Schedule bracketSchedule = scheduleFactory.Generate(
+                new HashSet<Team>(teams),
+                new HashSet<Reader>(currentTournament.Readers));
+
+            int oldRoundCount = currentTournament.Schedule.Rounds.Count;
+            foreach (Round round in bracketSchedule.Rounds)
+            {
+                currentTournament.Schedule.AddRound(round);
+            }
+
+            ITournamentChannelManager channelManager = new TournamentChannelManager(guild);
+            await channelManager.CreateChannelsForRebracket(
+                this.Client.CurrentUser, currentTournament, bracketSchedule.Rounds, oldRoundCount + 1);
+
+            await this.UpdateStage(currentTournament, TournamentStage.RunningTournament, message.Channel);
         }
 
         private Task OnMessageReceived(SocketMessage message)

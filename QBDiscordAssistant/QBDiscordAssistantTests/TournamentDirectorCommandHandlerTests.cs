@@ -141,7 +141,7 @@ namespace QBDiscordAssistantTests
                 0,
                 new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, 1) },
                 new KeyValuePair<Team, ulong>[] { new KeyValuePair<Team, ulong>(mainTeam, teamRoleId) });
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddPlayerAsync(guildUser, TeamName);
@@ -167,6 +167,191 @@ namespace QBDiscordAssistantTests
                 out GlobalTournamentsManager globalManager,
                 out BotCommandHandler commandHandler,
                 out ITournamentState state);
+
+            Team mainTeam = new Team()
+            {
+                Name = TeamName
+            };
+            state.AddTeams(new Team[] { mainTeam });
+
+            for (ulong id = DefaultUserId; id <= DefaultUserId + 1; id++)
+            {
+                IGuildUser guildUser = this.CreateGuildUser(id);
+                await commandHandler.AddPlayerAsync(guildUser, TeamName);
+                string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
+                messageStore.VerifyDirectMessages(expectedMessage);
+                messageStore.Clear();
+            }
+
+            TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
+            VerifyOnCurrentTournament(manager, currentTournament =>
+            {
+                Player player = currentTournament.Players.First(p => p.Id == DefaultUserId);
+                Assert.AreEqual(mainTeam, player.Team, "First player's team was set incorrectly.");
+                Player secondPlayer = currentTournament.Players.First(p => p.Id == DefaultUserId + 1);
+                Assert.AreEqual(mainTeam, player.Team, "Second player's team was set incorrectly.");
+            });
+        }
+
+        [TestMethod]
+        public async Task BackOnAddReadersSucceeds()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            state.AddReaders(
+                new Reader[] 
+                { new Reader()
+                    {
+                        Id = 1,
+                        Name = "Alice"
+                    }
+                });
+            state.UpdateStage(TournamentStage.SetRoundRobins, out _, out _);
+
+            Assert.AreEqual(
+                1, state.Readers.Count(), "Unexpected number of readers after going to the next round");
+            Assert.AreEqual(
+                TournamentStage.SetRoundRobins, state.Stage, "Stage didn't go to setting the number of round robins");
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(TournamentStage.AddReaders, state.Stage, "Stage didn't go back to add readers");
+            Assert.AreEqual(0, state.Readers.Count(), "Readers weren't cleared");
+            Assert.AreEqual(0, messageStore.DirectMessages.Count, "No direct messages should've been sent");
+        }
+
+        [TestMethod]
+        public async Task BackOnAddTeamsSucceeds()
+        {
+            const int roundRobinsCount = 2;
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            state.RoundRobinsCount = roundRobinsCount;
+            state.UpdateStage(TournamentStage.AddTeams, out _, out _);
+
+            Assert.AreEqual(
+                roundRobinsCount, 
+                state.RoundRobinsCount, 
+                "Unexpected number of round robins after going to the next round");
+            Assert.AreEqual(
+                TournamentStage.AddTeams, state.Stage, "Stage didn't go to adding teams");
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(
+                TournamentStage.SetRoundRobins, 
+                state.Stage, 
+                "Stage didn't go back to setting the number of round robins");
+            Assert.AreEqual(0, state.RoundRobinsCount, "Round robins count wasn't reset");
+            Assert.AreEqual(0, messageStore.DirectMessages.Count, "No direct messages should've been sent");
+        }
+
+        [TestMethod]
+        public async Task BackOnAddPlayersSucceeds()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            Team[] teams = new Team[]
+            {
+                new Team()
+                {
+                    Bracket = 0,
+                    Name = "A"
+                },
+                new Team()
+                {
+                    Bracket = 0,
+                    Name = "B"
+                },
+            };
+
+            state.AddTeams(teams);
+            state.UpdateStage(TournamentStage.AddPlayers, out _, out _);
+
+            Assert.AreEqual(
+                teams.Length,
+                state.Teams.Count(),
+                "Unexpected number of teams after going to the next round");
+            Assert.AreEqual(
+                TournamentStage.AddPlayers, state.Stage, "Stage didn't go to adding players");
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(
+                TournamentStage.AddTeams,
+                state.Stage,
+                "Stage didn't go back to adding teams");
+            Assert.AreEqual(0, state.Teams.Count(), "Teams weren't reset");
+            Assert.AreEqual(0, messageStore.DirectMessages.Count, "No direct messages should've been sent");
+        }
+
+        [TestMethod]
+        public async Task BackOnFinalsFails()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            state.UpdateStage(TournamentStage.Finals, out _, out _);
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(TournamentStage.Finals, state.Stage, "Stage shouldn't of changed");
+            messageStore.VerifyDirectMessages(BotStrings.CannotGoBack(TournamentStage.Finals));
+        }
+
+        [TestMethod]
+        public async Task BackOnRebracketingSucceeds()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out _,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            state.UpdateStage(TournamentStage.Rebracketing, out _, out _);
+            Assert.AreEqual(
+                TournamentStage.Rebracketing, state.Stage, "Stage didn't go to rebracketing");
+
+            await commandHandler.GoBackAsync();
+            Assert.AreEqual(
+                TournamentStage.RunningTournament,
+                state.Stage,
+                "Stage didn't go back to adding teams");
+            Assert.AreEqual(0, messageStore.DirectMessages.Count, "No direct messages should've been sent");
+            Assert.AreEqual(0, messageStore.ChannelEmbeds.Count, "No channel embeds should've been sent");
+        }
+
+        [TestMethod]
+        public async Task BackSucceeds()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out GlobalTournamentsManager globalManager,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            TournamentStage[] stagesThatSupportBack = new TournamentStage[]
+            {
+                TournamentStage.AddReaders,
+                TournamentStage.SetRoundRobins,
+                TournamentStage.AddTeams,
+                TournamentStage.AddPlayers,
+                TournamentStage.BotSetup,
+                TournamentStage.RunningTournament,
+                TournamentStage.Rebracketing,
+                TournamentStage.Finals
+            };
 
             Team mainTeam = new Team()
             {
@@ -269,7 +454,7 @@ namespace QBDiscordAssistantTests
             ITournamentState state = this.AddCurrentTournament(globalManager);
 
             state.UpdateStage(
-                TournamentStage.RunningPrelims, out string nextStageTitle, out string nextStageInstructions);
+                TournamentStage.RunningTournament, out string nextStageTitle, out string nextStageInstructions);
 
             Team[] teams = teamRoleIds
                 .Select(id => new Team() { Name = $"Team {id}" })
@@ -320,7 +505,7 @@ namespace QBDiscordAssistantTests
         }
 
         [TestMethod]
-        public async Task FinalsFailsWhenNotRunningPrelims()
+        public async Task FinalsFailsWhenNotRunningTournament()
         {
             this.InitializeWithCurrentTournament(
                 out MessageStore messageStore,
@@ -352,9 +537,9 @@ namespace QBDiscordAssistantTests
                 messageStore,
                 new HashSet<TournamentStage>()
                 {
-                    TournamentStage.RunningPrelims
+                    TournamentStage.RunningTournament
                 },
-                BotStrings.ErrorFinalsOnlySetDuringPrelims,
+                BotStrings.ErrorFinalsOnlySetDuringPrelimsOrPlayoffs,
                 () => commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts));
         }
 
@@ -552,9 +737,10 @@ namespace QBDiscordAssistantTests
                     new KeyValuePair<Team, ulong>(firstTeam, 3),
                     new KeyValuePair<Team, ulong>(secondTeam, 4)
                 });
+            state.ChannelIds = new ulong[] { 10, 11 };
 
             IGuildUser readerUser = this.CreateGuildUser(DefaultUserId, new List<string>(roles));
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
             await commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts);
             messageStore.VerifyDirectMessages();
 
@@ -576,16 +762,16 @@ namespace QBDiscordAssistantTests
                 switch (r.Name)
                 {
                     case directorRole:
-                        expectedPermissions = BotCommandHandler.PrivilegedOverwritePermissions;
+                        expectedPermissions = TournamentChannelManager.PrivilegedOverwritePermissions;
                         break;
                     case readerRole:
-                        expectedPermissions = BotCommandHandler.PrivilegedOverwritePermissions;
+                        expectedPermissions = TournamentChannelManager.PrivilegedOverwritePermissions;
                         break;
                     case team1Role:
-                        expectedPermissions = BotCommandHandler.TeamPermissions;
+                        expectedPermissions = TournamentChannelManager.TeamPermissions;
                         break;
                     case team2Role:
-                        expectedPermissions = BotCommandHandler.TeamPermissions;
+                        expectedPermissions = TournamentChannelManager.TeamPermissions;
                         break;
                     default:
                         Assert.Fail($"Unexpected role created: {r.Name}");
@@ -597,7 +783,7 @@ namespace QBDiscordAssistantTests
             }
 
             Assert.AreEqual(
-                BotCommandHandler.PrivilegedOverwritePermissions,
+                TournamentChannelManager.PrivilegedOverwritePermissions,
                 channel.GetPermissionOverwrite(context.Client.CurrentUser),
                 "Bot doesn't have the proper permissions.");
         }
@@ -648,6 +834,43 @@ namespace QBDiscordAssistantTests
             await commandHandler.GetPlayersAsync();
             string expectedMessage = $"FirstTeam: Nickname1, Nickname2{Environment.NewLine}SecondTeam: Nickname3";
             messageStore.VerifyDirectMessages(expectedMessage);
+        }
+
+        [TestMethod]
+        public async Task RebracketFailsWhenNotRunningTournament()
+        {
+            this.InitializeWithCurrentTournament(
+                out MessageStore messageStore,
+                out GlobalTournamentsManager globalManager,
+                out BotCommandHandler commandHandler,
+                out ITournamentState state);
+
+            Reader reader = new Reader()
+            {
+                Id = DefaultUserId,
+                Name = "First Reader"
+            };
+            state.AddReaders(new Reader[] { reader });
+
+            Team firstTeam = new Team()
+            {
+                Name = "Team1"
+            };
+            Team secondTeam = new Team()
+            {
+                Name = "Team2"
+            };
+            state.AddTeams(new Team[] { firstTeam, secondTeam });
+
+            await VerifyAllowedStages(
+                state,
+                messageStore,
+                new HashSet<TournamentStage>()
+                {
+                    TournamentStage.RunningTournament
+                },
+                BotStrings.CanOnlyRebracketWhileRunning,
+                () => commandHandler.RebracketAsync());
         }
 
         [TestMethod]
@@ -912,7 +1135,7 @@ namespace QBDiscordAssistantTests
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
-                Assert.AreEqual(TournamentStage.RunningPrelims, currentTournament.Stage, "Wrong stage."));
+                Assert.AreEqual(TournamentStage.RunningTournament, currentTournament.Stage, "Wrong stage."));
             IReadOnlyCollection<IGuildChannel> createdChannels = await context.Guild.GetChannelsAsync();
 
             // TODO: Find a way to assert permissions and channel type.
@@ -992,7 +1215,8 @@ namespace QBDiscordAssistantTests
                 messageStore,
                 new HashSet<TournamentStage>()
                 {
-                    TournamentStage.RunningPrelims,
+                    TournamentStage.RunningTournament,
+                    TournamentStage.Rebracketing,
                     TournamentStage.Finals,
                     TournamentStage.Complete
                 },
@@ -1025,7 +1249,7 @@ namespace QBDiscordAssistantTests
                 new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, 1) },
                 Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId + 1);
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 2, new List<string>(readerRoles));
@@ -1075,7 +1299,7 @@ namespace QBDiscordAssistantTests
                 },
                 Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1, new List<string>(readerRoles));
@@ -1118,7 +1342,7 @@ namespace QBDiscordAssistantTests
                 new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(firstReader, readerRoleId) },
                 Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1);
@@ -1163,7 +1387,7 @@ namespace QBDiscordAssistantTests
                 new KeyValuePair<Reader, ulong>[] { new KeyValuePair<Reader, ulong>(reader, readerRoleId) },
                 Enumerable.Empty<KeyValuePair<Team, ulong>>());
 
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
 
             IGuildUser readerUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
             await commandHandler.SwitchReaderAsync(readerUser, readerUser);
@@ -1189,7 +1413,7 @@ namespace QBDiscordAssistantTests
                     continue;
                 }
 
-                state.UpdateStage(stage, out string nextTitle, out string nextStageInstructions);
+                state.UpdateStage(stage, out string _, out string _);
                 await action();
                 messageStore.VerifyDirectMessages(expectedErrorMessage);
                 messageStore.Clear();
@@ -1266,11 +1490,11 @@ namespace QBDiscordAssistantTests
             state.AddTeams(teams);
 
             IGuildUser readerUser = this.CreateGuildUser(readerId);
-            state.UpdateStage(TournamentStage.RunningPrelims, out string nextTitle, out string nextStageInstructions);
+            state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
             await commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts);
             messageStore.VerifyDirectMessages(expectedErrorMessage);
 
-            Assert.AreEqual(TournamentStage.RunningPrelims, state.Stage, "Stage should not have been changed.");
+            Assert.AreEqual(TournamentStage.RunningTournament, state.Stage, "Stage should not have been changed.");
         }
 
         // start

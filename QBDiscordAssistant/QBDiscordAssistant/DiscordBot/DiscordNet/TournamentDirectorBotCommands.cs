@@ -57,6 +57,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return this.HandleCommandAsync(commandHandler => commandHandler.GetPlayersAsync());
         }
 
+        [Command("rebracket")]
+        [Summary("Create new rooms for the new brackets. The teams specified must already exist")]
+        public Task Rebracket()
+        {
+            this.Logger.Information("{id} is rebracketing", this.Context.User.Id);
+            return this.HandleCommandAsync(commandHandler => commandHandler.RebracketAsync());
+        }
+
         [Command("start")]
         [Summary("Starts the current tournament")]
         public Task Start()
