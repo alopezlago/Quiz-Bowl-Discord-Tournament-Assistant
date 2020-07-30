@@ -6,7 +6,7 @@
         {
             return tournamentState != null &&
                 (tournamentState.Stage == TournamentStage.RunningTournament ||
-                    tournamentState.Stage == TournamentStage.Rebracketing || 
+                    tournamentState.Stage == TournamentStage.Rebracketing ||
                     tournamentState.Stage == TournamentStage.Finals);
         }
     }

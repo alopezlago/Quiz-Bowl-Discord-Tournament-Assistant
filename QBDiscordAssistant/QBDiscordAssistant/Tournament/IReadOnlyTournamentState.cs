@@ -9,6 +9,7 @@ namespace QBDiscordAssistant.Tournament
         IEnumerable<ulong> ChannelIds { get; }
         IEnumerable<ulong> JoinTeamMessageIds { get; }
         string Name { get; }
+        ulong? PinnedStartMessageId { get; }
         IEnumerable<Player> Players { get; }
         IEnumerable<Reader> Readers { get; }
         int RoundRobinsCount { get; }

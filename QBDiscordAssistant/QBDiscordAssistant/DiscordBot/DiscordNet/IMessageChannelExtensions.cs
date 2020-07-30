@@ -7,8 +7,8 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     internal static class IMessageChannelExtensions
     {
-        const int MaxFieldsInEmbed = 20;
-        const int MaxEmbedLength = 6000;
+        private const int MaxFieldsInEmbed = 20;
+        private const int MaxEmbedLength = 6000;
 
         // We enumerate through each field to create an list of EmbedFieldBuidlers. Then we can do both
         // the item limits and item length limits while iterating through that list, since we can access the index.

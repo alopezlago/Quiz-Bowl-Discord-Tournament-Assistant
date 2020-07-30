@@ -3,8 +3,8 @@
 namespace QBDiscordAssistant
 {
     [SuppressMessage(
-        "Design", 
-        "CA1000:Do not declare static members on generic types", 
+        "Design",
+        "CA1000:Do not declare static members on generic types",
         Justification = "Prefer this to static factory class to create it.")]
     public class Result<T>
     {
