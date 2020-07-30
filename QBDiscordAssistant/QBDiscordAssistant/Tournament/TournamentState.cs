@@ -31,6 +31,8 @@ namespace QBDiscordAssistant.Tournament
 
         public ulong GuildId { get; }
 
+        public ulong? PinnedStartMessageId { get; set; }
+
         public TournamentRoleIds TournamentRoles { get; set; }
 
         // TODO: Investigate if DirectorIds should have a setter too, now that this is protected by read/write locks.

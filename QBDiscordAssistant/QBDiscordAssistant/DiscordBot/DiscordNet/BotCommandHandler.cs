@@ -409,8 +409,10 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         },
                         (round, roundIndex) =>
                         {
-                            EmbedFieldBuilder fieldBuilder = new EmbedFieldBuilder();
-                            fieldBuilder.Name = BotStrings.RoundNumber(roundIndex + 1);
+                            EmbedFieldBuilder fieldBuilder = new EmbedFieldBuilder
+                            {
+                                Name = BotStrings.RoundNumber(roundIndex + 1)
+                            };
                             IEnumerable<Game> games = round.Games
                                 .Where(game => game.Teams != null && game.Reader != null);
                             if (team != null)
@@ -589,7 +591,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             BotStrings.CreatingChannelsAndRoles, options: RequestOptionsSettings.Default);
                         await this.CreateArtifactsAsync(currentTournament);
 
-                        await this.UpdateStageAsync(currentTournament, TournamentStage.RunningTournament);
+                        IUserMessage updateMessage = await this.UpdateStageAsync(
+                            currentTournament, TournamentStage.RunningTournament);
+                        await updateMessage.PinAsync(RequestOptionsSettings.Default);
+                        currentTournament.PinnedStartMessageId = updateMessage.Id;
+
                         startSucceeded = true;
                     }
                     catch (Exception ex)
@@ -871,6 +877,24 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 deleteRoleTasks = Array.Empty<Task>();
             }
 
+            if (state.PinnedStartMessageId != null)
+            {
+                // TODO: This will fail if !end is called in the non-general channel
+                this.Logger.Debug("Deleting the pinned start message created by tournament {name}", state.Name);
+                IMessage message = await this.Context.Channel.GetMessageAsync(
+                    state.PinnedStartMessageId.Value, options: RequestOptionsSettings.Default);
+                if (message?.IsPinned == true && message is IUserMessage pinnedMessage)
+                {
+                    await pinnedMessage.UnpinAsync(RequestOptionsSettings.Default);
+                    this.Logger.Debug("Unpinned start message created by the tournament {name}", state.Name);
+                }
+                else
+                {
+                    this.Logger.Debug(
+                        "Couldn't find pinned start message created by the tournament {name}", state.Name);
+                }
+            }
+
             this.Logger.Debug("Deleting all roles created by the tournament {name}", state.Name);
             await Task.WhenAll(deleteRoleTasks);
             this.Logger.Debug("All roles created by the tournament {name} are deleted", state.Name);
@@ -935,14 +959,15 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             await channel.SendMessageAsync(errorMessage, options: RequestOptionsSettings.Default);
         }
 
-        private async Task UpdateStageAsync(ITournamentState state, TournamentStage stage, bool sendMessage = true)
+        private async Task<IUserMessage> UpdateStageAsync(ITournamentState state, TournamentStage stage, bool sendMessage = true)
         {
             state.UpdateStage(stage, out string title, out string instructions);
             if (title == null && instructions == null)
             {
-                return;
+                return null;
             }
 
+            IUserMessage updateMessage = null;
             if (sendMessage)
             {
                 EmbedBuilder embedBuilder = new EmbedBuilder
@@ -950,11 +975,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     Title = title,
                     Description = instructions
                 };
-                await this.Context.Channel.SendMessageAsync(
+                updateMessage = await this.Context.Channel.SendMessageAsync(
                     embed: embedBuilder.Build(), options: RequestOptionsSettings.Default);
             }
 
             this.Logger.Debug("Moved to stage {stage}", stage);
+            return updateMessage;
         }
     }
 }

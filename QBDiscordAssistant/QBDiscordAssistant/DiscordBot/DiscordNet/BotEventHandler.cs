@@ -337,7 +337,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             return true;
         }
 
-        private async static Task AddReactionsToMessage(
+        private static async Task AddReactionsToMessage(
             IUserMessage message, IEnumerable<IEmote> emotesForMessage, ITournamentState currentTournament)
         {
             currentTournament.AddJoinTeamMessageId(message.Id);

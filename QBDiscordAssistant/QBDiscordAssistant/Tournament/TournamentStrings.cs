@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-
-namespace QBDiscordAssistant.Tournament
+﻿namespace QBDiscordAssistant.Tournament
 {
     public static class TournamentStrings
     {
@@ -72,7 +69,7 @@ namespace QBDiscordAssistant.Tournament
 
         public static string TournamentStartedDirections(string tournamentName)
         {
-            return $"Tournament '{tournamentName}' has started. Go to your first round room and follow the instructions.";
+            return $"Tournament '{tournamentName}' has started. Go to your first round room and follow the instructions.\n\nPlease read the code of conduct here: http://www.pace-nsc.org/nsc-code-of-conduct/. Everyone has a right to feel safe and welcomed here. If you observe any misconduct, please reach out to the tournament director or a reader. You may also report misconduct at http://tinyurl.com/qbmisconduct.";
         }
     }
 }

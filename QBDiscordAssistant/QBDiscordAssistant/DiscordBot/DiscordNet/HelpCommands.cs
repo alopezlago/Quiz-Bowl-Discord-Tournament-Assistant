@@ -32,7 +32,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         [Command("help")]
         [Summary("Lists available commands and how to use them.")]
-        public Task Help([Remainder] [Summary("Command name")] string rawCommandName)
+        public Task Help([Remainder][Summary("Command name")] string rawCommandName)
         {
             return this.SendHelpInformation(rawCommandName);
         }

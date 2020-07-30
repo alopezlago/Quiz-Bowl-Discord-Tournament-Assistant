@@ -21,7 +21,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         [Summary("Adds a tournament director to a tournament, and creates that tournament if it doesn't exist yet.")]
         public Task AddTournamentDirector(
             [Summary("Member to add as the tournament director (as a @mention).")] IGuildUser newDirector,
-            [Remainder] [Summary("Name of the tournament.")] string tournamentName)
+            [Remainder][Summary("Name of the tournament.")] string tournamentName)
         {
             this.Logger.Information(
                 "{0} adding TD {1} for {2}", this.Context.User.Id, newDirector.Id, tournamentName);

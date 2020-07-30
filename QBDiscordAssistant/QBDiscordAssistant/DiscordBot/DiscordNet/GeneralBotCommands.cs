@@ -5,7 +5,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 {
     public class GeneralBotCommands : BotCommandsBase
     {
-        public GeneralBotCommands(GlobalTournamentsManager globalManager) 
+        public GeneralBotCommands(GlobalTournamentsManager globalManager)
             : base(globalManager)
         {
         }

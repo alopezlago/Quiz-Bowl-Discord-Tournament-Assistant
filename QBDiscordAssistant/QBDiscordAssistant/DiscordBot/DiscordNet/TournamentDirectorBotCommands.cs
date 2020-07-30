@@ -19,7 +19,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         [Command("setup")]
         [Summary("Begins the setup phase of the tournament, where readers and teams can be added.")]
-        public Task Setup([Remainder] [Summary("Name of the tournament.")] string tournamentName)
+        public Task Setup([Remainder][Summary("Name of the tournament.")] string tournamentName)
         {
             this.Logger.Information(
                 "{id} is attempting to set up {tournamentName}", this.Context.User.Id, tournamentName);
@@ -31,7 +31,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         [Summary("Adds a player to a team.")]
         public Task AddPlayer(
             [Summary("Member to add as the player (as a @mention).")] IGuildUser user,
-            [Remainder] [Summary("Team name.")] string teamName)
+            [Remainder][Summary("Team name.")] string teamName)
         {
             this.Logger.Information(
                 "{0} is adding the user {1} to the team {2}", this.Context.User.Id, user.Id, teamName);
@@ -96,7 +96,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         [Summary("Sets up a room for the finals participants and reader.")]
         public Task Finals(
             [Summary("Reader for the finals (as a @mention).")] IGuildUser readerUser,
-            [Remainder] [Summary("Name of the two teams in the finals, separated by a comma.")] string rawTeamNameParts)
+            [Remainder][Summary("Name of the two teams in the finals, separated by a comma.")] string rawTeamNameParts)
         {
             this.Logger.Information(
                 "{0} is attempting to start finals with the reader {1} and teams {2}",
