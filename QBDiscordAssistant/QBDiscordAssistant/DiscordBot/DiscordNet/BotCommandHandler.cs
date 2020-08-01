@@ -65,7 +65,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!currentTournament.TryGetTeamFromName(teamName, out Team team))
                     {
                         this.Logger.Debug("Player {id} could not be added to nonexistent {teamName}", user.Id, teamName);
-                        return this.SendUserMessageAsync(BotStrings.TeamDoesNotExist(teamName));
+                        return this.SendChannelMessage(BotStrings.TeamDoesNotExist(teamName));
                     }
 
                     Player player = new Player()
@@ -76,7 +76,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!currentTournament.TryAddPlayer(player))
                     {
                         this.Logger.Debug("Player {id} already on team; not added to {teamName}", user.Id, teamName);
-                        return this.SendUserMessageAsync(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
+                        return this.SendChannelMessage(BotStrings.PlayerIsAlreadyOnTeam(user.Mention));
                     }
 
                     if (!currentTournament.IsTorunamentInPlayStage())
@@ -95,7 +95,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                             user.Id,
                             teamName);
                         currentTournament.TryRemovePlayer(player.Id);
-                        return this.SendUserMessageAsync(
+                        return this.SendChannelMessage(
                             BotStrings.PlayerCannotBeAddedToTeamWithNoRole(user.Mention, teamName));
                     }
 
@@ -121,7 +121,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 user.Id,
                 teamName,
                 teamRole != null);
-            await this.SendUserMessageAsync(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
+            await this.SendChannelMessage(BotStrings.AddPlayerSuccessful(user.Mention, teamName));
         }
 
         public Task AddTournamentDirectorAsync(IGuildUser newDirector, string tournamentName)
@@ -154,13 +154,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 this.Logger.Debug(
                     "Added {id} as a tournament director for {tournamentName}", newDirector.Id, tournamentName);
-                return this.SendUserMessageAsync(
+                return this.SendChannelMessage(
                     BotStrings.AddTournamentDirectorSuccessful(tournamentName, this.Context.Guild.Name));
             }
 
             this.Logger.Debug(
                 "{id} already a tournament director for {tournamentName}", newDirector.Id, tournamentName);
-            return this.SendUserMessageAsync(
+            return this.SendChannelMessage(
                 BotStrings.UserAlreadyTournamentDirector(tournamentName, this.Context.Guild.Name));
         }
 
@@ -201,7 +201,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         default:
                             // Nothing to go back to, so do nothing.
                             this.Logger.Debug("Could not go back on stage {stage}", currentTournament.Stage);
-                            await this.SendUserMessageAsync(BotStrings.CannotGoBack(currentTournament.Stage));
+                            await this.SendChannelMessage(BotStrings.CannotGoBack(currentTournament.Stage));
                             return;
                     }
 
@@ -216,7 +216,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         {
             await this.CleanupAllPossibleTournamentArtifactsAsync();
             this.Logger.Debug("All tournament artifacts cleared");
-            await this.SendUserMessageAsync(BotStrings.AllPossibleTournamentArtifactsCleaned(this.Context.Guild.Name));
+            await this.SendChannelMessage(BotStrings.AllPossibleTournamentArtifactsCleaned(this.Context.Guild.Name));
         }
 
         public async Task EndTournamentAsync()
@@ -228,12 +228,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!manager.TryClearCurrentTournament())
             {
                 this.Logger.Debug("Tournament cleanup failed");
-                await this.SendUserMessageAsync(BotStrings.TournamentWasNotRemoved);
+                await this.SendChannelMessage(BotStrings.TournamentWasNotRemoved);
                 return;
             }
 
             this.Logger.Debug("Tournament cleanup finished");
-            await this.SendUserMessageAsync(BotStrings.TournamentCleanupFinished(this.Context.Guild.Name));
         }
 
         public async Task SetupFinalsAsync(IGuildUser readerUser, string rawTeamNameParts)
@@ -245,14 +244,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (currentTournament?.Stage != TournamentStage.RunningTournament)
                     {
                         this.Logger.Debug("Could not start finals in stage {stage}", currentTournament?.Stage);
-                        await this.SendUserMessageAsync(BotStrings.ErrorFinalsOnlySetDuringPrelimsOrPlayoffs);
+                        await this.SendChannelMessage(BotStrings.ErrorFinalsOnlySetDuringPrelimsOrPlayoffs);
                         return;
                     }
 
                     if (!currentTournament.TryGetReader(readerUser.Id, out Reader reader))
                     {
                         this.Logger.Debug("Could not start finals because {1} is not a reader", readerUser.Id);
-                        await this.SendUserMessageAsync(BotStrings.ErrorGivenUserIsntAReader);
+                        await this.SendChannelMessage(BotStrings.ErrorGivenUserIsntAReader);
                         return;
                     }
 
@@ -260,7 +259,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         this.Logger.Debug(
                             "Could not start finals because no teams were specified");
-                        await this.SendUserMessageAsync(BotStrings.ErrorNoTeamsSpecified);
+                        await this.SendChannelMessage(BotStrings.ErrorNoTeamsSpecified);
                         return;
                     }
 
@@ -270,7 +269,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         this.Logger.Debug(
                             "Could not start finals because of this error: {errorMessage}", errorMessage);
-                        await this.SendUserMessageAsync(BotStrings.ErrorGenericMessage(errorMessage));
+                        await this.SendChannelMessage(BotStrings.ErrorGenericMessage(errorMessage));
                         return;
                     }
 
@@ -278,7 +277,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         this.Logger.Debug(
                             "Could not start finals because {count} teams were specified", teamNames.Count);
-                        await this.SendUserMessageAsync(BotStrings.ErrorTwoTeamsMustBeSpecifiedFinals(teamNames.Count));
+                        await this.SendChannelMessage(BotStrings.ErrorTwoTeamsMustBeSpecifiedFinals(teamNames.Count));
                         return;
                     }
 
@@ -291,7 +290,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         this.Logger.Debug(
                             "Could not start finals because some teams were not in the tournament", teamNames.Count);
-                        await this.SendUserMessageAsync(
+                        await this.SendChannelMessage(
                             BotStrings.ErrorAtLeastOneTeamNotInTournament(string.Join(", ", teamNames)));
                         return;
                     }
@@ -374,7 +373,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             else if (!teamsAndPlayers.Any())
             {
                 this.Logger.Debug("Unable to get players because there are no teams yet");
-                await this.SendUserMessageAsync(BotStrings.NoTeamsYet);
+                await this.SendChannelMessage(BotStrings.NoTeamsYet);
                 return;
             }
 
@@ -383,7 +382,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             string[] teamPlayerLines = await Task.WhenAll(teamsAndPlayers
                 .Select(teamPlayer => this.GetTeamPlayersLineAsync(teamPlayer)));
             string content = string.Join(Environment.NewLine, teamPlayerLines);
-            await this.SendUserMessageAsync(content);
+            await this.SendChannelMessage(content);
             this.Logger.Debug("Current players returned successfully");
         }
 
@@ -438,7 +437,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 {
                     if (currentTournament.Stage != TournamentStage.RunningTournament)
                     {
-                        return this.Context.User.SendMessageAsync(BotStrings.CanOnlyRebracketWhileRunning);
+                        return this.Context.Channel.SendMessageAsync(BotStrings.CanOnlyRebracketWhileRunning);
                     }
 
                     return this.UpdateStageAsync(currentTournament, TournamentStage.Rebracketing);
@@ -457,7 +456,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!currentTournament.TryRemovePlayer(user.Id))
                     {
                         this.Logger.Debug("Player {id} wasn't on any team", user.Id);
-                        return this.SendUserMessageAsync(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
+                        return this.SendChannelMessage(BotStrings.PlayerIsNotOnAnyTeam(user.Mention));
                     }
 
                     if (currentTournament.IsTorunamentInPlayStage())
@@ -487,7 +486,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             this.Logger.Debug(
                 "Player {0} was removed from the tournament. Role removed: {2}", user.Id, teamRoleIds != null);
-            await this.SendUserMessageAsync(BotStrings.PlayerRemoved(user.Mention));
+            await this.SendChannelMessage(BotStrings.PlayerRemoved(user.Mention));
         }
 
         public async Task RemoveTournamentDirectorAsync(IGuildUser oldDirector, string tournamentName)
@@ -505,14 +504,13 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             // TODO: Harden this. Since it's not guaranteed to be the current tournament, we can't use the helper
             // methods
-            IDMChannel dmChannel = await this.Context.User.GetOrCreateDMChannelAsync();
             if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
             {
                 this.Logger.Debug(
                     "Couldn't remove director {id} for nonexistent tournament {tournamentName}",
                     oldDirector.Id,
                     tournamentName);
-                await dmChannel.SendMessageAsync(
+                await this.Context.Channel.SendMessageAsync(
                     BotStrings.TournamentDoesNotExist(tournamentName, this.Context.Guild.Name),
                     options: RequestOptionsSettings.Default);
                 return;
@@ -522,7 +520,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             {
                 this.Logger.Debug(
                     "Removed {id} as a tournament director for {tournamentName}", oldDirector.Id, tournamentName);
-                await dmChannel.SendMessageAsync(
+                await this.Context.Channel.SendMessageAsync(
                     BotStrings.RemovedTournamentDirector(tournamentName, this.Context.Guild.Name),
                     options: RequestOptionsSettings.Default);
                 return;
@@ -532,7 +530,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 "User {id} is not a director for {tournamentName}, so could not be removed",
                 oldDirector.Id,
                 tournamentName);
-            await dmChannel.SendMessageAsync(
+            await this.Context.Channel.SendMessageAsync(
                 BotStrings.UserNotTournamentDirector(tournamentName, this.Context.Guild.Name), options: RequestOptionsSettings.Default);
         }
 
@@ -551,7 +549,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
             if (!manager.TrySetCurrentTournament(tournamentName, out string errorMessage))
             {
                 this.Logger.Debug("Error when setting up tournament: {errorMessage}", errorMessage);
-                return this.SendUserMessageAsync(
+                return this.SendChannelMessage(
                     BotStrings.ErrorSettingCurrentTournament(this.Context.Guild.Name, errorMessage));
             }
 
@@ -569,7 +567,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     {
                         // !start only applies once we've started adding players
                         this.Logger.Debug("Start failed because we were in stage {stage}", currentTournament?.Stage);
-                        await this.SendUserMessageAsync(BotStrings.CommandOnlyUsedTournamentReadyStart);
+                        await this.SendChannelMessage(BotStrings.CommandOnlyUsedTournamentReadyStart);
                         return;
                     }
 
@@ -632,7 +630,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                     if (!currentTournament.IsTorunamentInPlayStage())
                     {
 
-                        await this.SendUserMessageAsync(BotStrings.CommandOnlyUsedWhileTournamentRunning);
+                        await this.SendChannelMessage(BotStrings.CommandOnlyUsedWhileTournamentRunning);
                         return;
                     }
 
@@ -641,26 +639,26 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                         .FirstOrDefault();
                     if (oldReaderRoleId == default(ulong))
                     {
-                        await this.SendUserMessageAsync(BotStrings.CouldntGetRoleForTheOldReader);
+                        await this.SendChannelMessage(BotStrings.CouldntGetRoleForTheOldReader);
                         return;
                     }
 
                     if (!currentTournament.IsReader(oldReaderUser.Id))
                     {
-                        await this.SendUserMessageAsync(BotStrings.NotACurrentReader(oldReaderUser.Mention));
+                        await this.SendChannelMessage(BotStrings.NotACurrentReader(oldReaderUser.Mention));
                         return;
                     }
                     else if (currentTournament.IsReader(newReaderUser.Id))
                     {
 
-                        await this.SendUserMessageAsync(BotStrings.IsAlreadyReader(newReaderUser.Mention));
+                        await this.SendChannelMessage(BotStrings.IsAlreadyReader(newReaderUser.Mention));
                         return;
                     }
 
                     if (!currentTournament.TryRemoveReader(oldReaderUser.Id))
                     {
 
-                        await this.SendUserMessageAsync(BotStrings.UnknownErrorRemovingOldReader);
+                        await this.SendChannelMessage(BotStrings.UnknownErrorRemovingOldReader);
                         return;
                     }
 
@@ -687,7 +685,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 oldReaderUser.RemoveRoleAsync(oldReaderRole, RequestOptionsSettings.Default)
             };
             await Task.WhenAll(roleChangeTasks);
-            await this.SendUserMessageAsync(BotStrings.ReadersSwitchedSuccessfully);
+            await this.SendChannelMessage(BotStrings.ReadersSwitchedSuccessfully);
         }
 
         private static TournamentsManager CreateTournamentsManager(ulong id)
@@ -951,6 +949,11 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 .Select(player => this.Context.Guild.GetUserAsync(player.Id)));
             IEnumerable<string> names = members.Select(member => member.Nickname ?? member.Username);
             return $"{teamPlayers.Item1.Name}: {string.Join(", ", names)}";
+        }
+
+        private Task SendChannelMessage(string message = null, Embed embed = null)
+        {
+            return this.Context.Channel.SendMessageAsync(message, embed: embed, options: RequestOptions.Default);
         }
 
         private async Task SendUserMessageAsync(string errorMessage)

@@ -33,7 +33,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddPlayerAsync(guildUser, TeamName);
             string expectedMessage = BotStrings.TeamDoesNotExist(TeamName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             // Tournament is no longer pending. Would need to use current tournament.
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
@@ -74,7 +74,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddPlayerAsync(guildUser, otherTeamName);
             string expectedMessage = BotStrings.PlayerIsAlreadyOnTeam(guildUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -102,7 +102,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddPlayerAsync(guildUser, TeamName);
             string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -146,7 +146,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddPlayerAsync(guildUser, TeamName);
             string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
             messageStore.Clear();
 
             Assert.AreEqual(1, guildUser.RoleIds.Count, "Unexpected number of role IDs for added player");
@@ -154,7 +154,7 @@ namespace QBDiscordAssistantTests
 
             await commandHandler.RemovePlayerAsync(guildUser);
             expectedMessage = BotStrings.PlayerRemoved(guildUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             Assert.AreEqual(0, guildUser.RoleIds.Count, "Unexpected number of role IDs for removed player");
         }
@@ -179,7 +179,7 @@ namespace QBDiscordAssistantTests
                 IGuildUser guildUser = this.CreateGuildUser(id);
                 await commandHandler.AddPlayerAsync(guildUser, TeamName);
                 string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
-                messageStore.VerifyDirectMessages(expectedMessage);
+                messageStore.VerifyChannelMessages(expectedMessage);
                 messageStore.Clear();
             }
 
@@ -307,7 +307,7 @@ namespace QBDiscordAssistantTests
 
             await commandHandler.GoBackAsync();
             Assert.AreEqual(TournamentStage.Finals, state.Stage, "Stage shouldn't of changed");
-            messageStore.VerifyDirectMessages(BotStrings.CannotGoBack(TournamentStage.Finals));
+            messageStore.VerifyChannelMessages(BotStrings.CannotGoBack(TournamentStage.Finals));
         }
 
         [TestMethod]
@@ -364,7 +364,7 @@ namespace QBDiscordAssistantTests
                 IGuildUser guildUser = this.CreateGuildUser(id);
                 await commandHandler.AddPlayerAsync(guildUser, TeamName);
                 string expectedMessage = BotStrings.AddPlayerSuccessful(guildUser.Mention, TeamName);
-                messageStore.VerifyDirectMessages(expectedMessage);
+                messageStore.VerifyChannelMessages(expectedMessage);
                 messageStore.Clear();
             }
 
@@ -390,7 +390,10 @@ namespace QBDiscordAssistantTests
             state.UpdateStage(TournamentStage.AddReaders, out string nextStageTitle, out string nextStageInstructions);
 
             await commandHandler.EndTournamentAsync();
-            messageStore.VerifyDirectMessages(BotStrings.TournamentCleanupFinished(DefaultGuildName));
+            string expectedEmbed = this.GetMockEmbedText(
+                TournamentStrings.TournamentCompleted,
+                TournamentStrings.AllTournamentChannelsRolesRemoved(DefaultTournamentName));
+            messageStore.VerifyChannelEmbeds(expectedEmbed);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsFalse(
@@ -482,7 +485,10 @@ namespace QBDiscordAssistantTests
             state.TournamentRoles = new TournamentRoleIds(directorId, readerRoleIdMap, teamRoleIdMap);
 
             await commandHandler.EndTournamentAsync();
-            messageStore.VerifyDirectMessages(BotStrings.TournamentCleanupFinished(DefaultGuildName));
+            string expectedEmbed = this.GetMockEmbedText(
+                TournamentStrings.TournamentCompleted,
+                TournamentStrings.AllTournamentChannelsRolesRemoved(DefaultTournamentName));
+            messageStore.VerifyChannelEmbeds(expectedEmbed);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsFalse(
@@ -798,7 +804,7 @@ namespace QBDiscordAssistantTests
                 out ITournamentState state);
 
             await commandHandler.GetPlayersAsync();
-            messageStore.VerifyDirectMessages(BotStrings.NoTeamsYet);
+            messageStore.VerifyChannelMessages(BotStrings.NoTeamsYet);
         }
 
         [TestMethod]
@@ -833,7 +839,7 @@ namespace QBDiscordAssistantTests
 
             await commandHandler.GetPlayersAsync();
             string expectedMessage = $"FirstTeam: Nickname1, Nickname2{Environment.NewLine}SecondTeam: Nickname3";
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
         }
 
         [TestMethod]
@@ -897,7 +903,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.RemovePlayerAsync(guildUser);
             string expectedMessage = BotStrings.PlayerRemoved(guildUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -923,7 +929,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.RemovePlayerAsync(guildUser);
             string expectedMessage = BotStrings.PlayerIsNotOnAnyTeam(guildUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -947,7 +953,7 @@ namespace QBDiscordAssistantTests
             await commandHandler.SetupTournamentAsync(tournamentName);
             string errorMessage = TournamentStrings.TournamentAlreadyRunning(DefaultTournamentName);
             string expectedMessage = BotStrings.ErrorSettingCurrentTournament(DefaultGuildName, errorMessage);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             VerifyOnCurrentTournament(manager, currentTournament =>
                 Assert.AreEqual(
@@ -966,7 +972,7 @@ namespace QBDiscordAssistantTests
             await commandHandler.SetupTournamentAsync(tournamentName);
             string errorMessage = TournamentStrings.TournamentCannotBeFound(tournamentName);
             string expectedMessage = BotStrings.ErrorSettingCurrentTournament(DefaultGuildName, errorMessage);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
         }
 
         [TestMethod]
@@ -1254,7 +1260,7 @@ namespace QBDiscordAssistantTests
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId + 1);
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 2, new List<string>(readerRoles));
             await commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser);
-            messageStore.VerifyDirectMessages(BotStrings.CouldntGetRoleForTheOldReader);
+            messageStore.VerifyChannelMessages(BotStrings.CouldntGetRoleForTheOldReader);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -1305,7 +1311,7 @@ namespace QBDiscordAssistantTests
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1, new List<string>(readerRoles));
             await commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser);
             string expectedMessage = BotStrings.IsAlreadyReader(newReaderUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -1347,7 +1353,7 @@ namespace QBDiscordAssistantTests
             IGuildUser oldReaderUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
             IGuildUser newReaderUser = this.CreateGuildUser(DefaultUserId + 1);
             await commandHandler.SwitchReaderAsync(oldReaderUser, newReaderUser);
-            messageStore.VerifyDirectMessages(BotStrings.ReadersSwitchedSuccessfully);
+            messageStore.VerifyChannelMessages(BotStrings.ReadersSwitchedSuccessfully);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -1392,7 +1398,7 @@ namespace QBDiscordAssistantTests
             IGuildUser readerUser = this.CreateGuildUser(DefaultUserId, new List<string>(readerRoles));
             await commandHandler.SwitchReaderAsync(readerUser, readerUser);
             string expectedMessage = BotStrings.IsAlreadyReader(readerUser.Mention);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             VerifyOnCurrentTournament(manager, currentTournament =>
@@ -1415,7 +1421,7 @@ namespace QBDiscordAssistantTests
 
                 state.UpdateStage(stage, out string _, out string _);
                 await action();
-                messageStore.VerifyDirectMessages(expectedErrorMessage);
+                messageStore.VerifyChannelMessages(expectedErrorMessage);
                 messageStore.Clear();
                 Assert.AreEqual(stage, state.Stage, "Stage should not have been changed.");
             }
@@ -1492,7 +1498,7 @@ namespace QBDiscordAssistantTests
             IGuildUser readerUser = this.CreateGuildUser(readerId);
             state.UpdateStage(TournamentStage.RunningTournament, out string nextTitle, out string nextStageInstructions);
             await commandHandler.SetupFinalsAsync(readerUser, rawTeamNameParts);
-            messageStore.VerifyDirectMessages(expectedErrorMessage);
+            messageStore.VerifyChannelMessages(expectedErrorMessage);
 
             Assert.AreEqual(TournamentStage.RunningTournament, state.Stage, "Stage should not have been changed.");
         }

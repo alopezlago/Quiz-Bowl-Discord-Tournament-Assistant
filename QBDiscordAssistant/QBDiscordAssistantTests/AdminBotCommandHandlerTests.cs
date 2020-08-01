@@ -27,7 +27,7 @@ namespace QBDiscordAssistantTests
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
                 DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -52,7 +52,7 @@ namespace QBDiscordAssistantTests
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.AddTournamentDirectorSuccessful(
                 DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -75,7 +75,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.AddTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.UserAlreadyTournamentDirector(DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -97,7 +97,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(DefaultUserId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.RemovedTournamentDirector(DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -119,7 +119,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.UserNotTournamentDirector(DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
 
             TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
             Assert.IsTrue(
@@ -139,7 +139,7 @@ namespace QBDiscordAssistantTests
             IGuildUser guildUser = this.CreateGuildUser(otherId);
             await commandHandler.RemoveTournamentDirectorAsync(guildUser, DefaultTournamentName);
             string expectedMessage = BotStrings.TournamentDoesNotExist(DefaultTournamentName, DefaultGuildName);
-            messageStore.VerifyDirectMessages(expectedMessage);
+            messageStore.VerifyChannelMessages(expectedMessage);
         }
 
         // TODO: Add test for ClearAll that checks that all artifacts are cleared.
