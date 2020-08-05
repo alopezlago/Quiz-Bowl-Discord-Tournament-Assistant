@@ -546,6 +546,14 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
             TournamentsManager manager = this.GlobalManager.GetOrAdd(this.Context.Guild.Id, CreateTournamentsManager);
 
+            // If the tournament didn't exist before, create it now. This must be an admin user who wanted to create
+            // the tournament without any other directors.
+            if (!manager.TryGetTournament(tournamentName, out ITournamentState state))
+            {
+                manager.AddOrUpdateTournament(tournamentName, new TournamentState(
+                    this.Context.Guild.Id, tournamentName), (name, oldState) => oldState);
+            }
+
             if (!manager.TrySetCurrentTournament(tournamentName, out string errorMessage))
             {
                 this.Logger.Debug("Error when setting up tournament: {errorMessage}", errorMessage);

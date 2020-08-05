@@ -34,12 +34,12 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
                 // TODO: We should investigate if there's a better place to make this check, because the attribute
                 // now knows about "setup"
                 string tournamentName = context.Message.Content.Substring(SetupCommand.Length).Trim();
-                if (manager.TryGetTournament(tournamentName, out ITournamentState tournament) &&
-                    CanActAsTournamentDirector(context, tournament))
+                if (IsAdminUser(context) ||
+                    (manager.TryGetTournament(tournamentName, out ITournamentState tournament) &&
+                        CanActAsTournamentDirector(context, tournament)))
                 {
                     return Task.FromResult(PreconditionResult.FromSuccess());
                 }
-
             }
 
             return Task.FromResult(PreconditionResult.FromError("User did not have tournament director privileges."));

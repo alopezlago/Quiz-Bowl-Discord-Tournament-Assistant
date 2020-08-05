@@ -71,7 +71,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public static string ErrorSettingCurrentTournament(string guildName, string errorMessage)
         {
-            return $"Error setting the current tournament in guild '{guildName}'. {errorMessage}.";
+            return $"Error setting the current tournament in guild '{guildName}'. {errorMessage}";
         }
 
         public static string ErrorTwoTeamsMustBeSpecifiedFinals(int teamCount)

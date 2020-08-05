@@ -293,8 +293,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         private static bool IsAdminUser(IGuildChannel channel, IGuildUser user)
         {
-            // TODO: Verify if this does work for non-owner admins, since they might not have overwritten Equals.
-            return user.Id == channel.Guild.OwnerId || user.GuildPermissions.Equals(GuildPermissions.All);
+            return user.Id == channel.Guild.OwnerId || user.GuildPermissions.Administrator;
         }
 
         private static bool TryGetEmojis(int count, out IEmote[] emotes, out string errorMessage)

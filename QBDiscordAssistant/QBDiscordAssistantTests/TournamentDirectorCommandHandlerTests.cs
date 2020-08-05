@@ -961,21 +961,6 @@ namespace QBDiscordAssistantTests
         }
 
         [TestMethod]
-        public async Task SetupFailsUnknownTournament()
-        {
-            const string tournamentName = DefaultTournamentName + "2";
-            MessageStore messageStore = new MessageStore();
-            ICommandContext context = this.CreateCommandContext(messageStore);
-            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
-            BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
-
-            await commandHandler.SetupTournamentAsync(tournamentName);
-            string errorMessage = TournamentStrings.TournamentCannotBeFound(tournamentName);
-            string expectedMessage = BotStrings.ErrorSettingCurrentTournament(DefaultGuildName, errorMessage);
-            messageStore.VerifyChannelMessages(expectedMessage);
-        }
-
-        [TestMethod]
         public async Task SetupSucceeds()
         {
             MessageStore messageStore = new MessageStore();
@@ -987,6 +972,30 @@ namespace QBDiscordAssistantTests
             await commandHandler.AddTournamentDirectorAsync(adminUser, DefaultTournamentName);
             messageStore.Clear();
 
+            await commandHandler.SetupTournamentAsync(DefaultTournamentName);
+            messageStore.VerifyChannelMessages();
+            string expectedEmbed = this.GetMockEmbedText(
+                TournamentStrings.AddReaders, TournamentStrings.ListMentionsOfAllReaders);
+            messageStore.VerifyChannelEmbeds(expectedEmbed);
+
+            TournamentsManager manager = globalManager.GetOrAdd(DefaultGuildId, id => new TournamentsManager());
+            VerifyOnCurrentTournament(manager, currentTournament =>
+            {
+                Assert.AreEqual(
+                    DefaultTournamentName, currentTournament.Name, "Current tournament was not set correctly.");
+                Assert.AreEqual(TournamentStage.AddReaders, currentTournament.Stage, "Wrong stage.");
+            });
+        }
+
+        [TestMethod]
+        public async Task SetupSucceedsAsAdminWithNoTDs()
+        {
+            MessageStore messageStore = new MessageStore();
+            ICommandContext context = this.CreateCommandContext(messageStore);
+            GlobalTournamentsManager globalManager = new GlobalTournamentsManager();
+            BotCommandHandler commandHandler = new BotCommandHandler(context, globalManager);
+
+            IGuildUser adminUser = this.CreateGuildUser(DefaultAdminId);
             await commandHandler.SetupTournamentAsync(DefaultTournamentName);
             messageStore.VerifyChannelMessages();
             string expectedEmbed = this.GetMockEmbedText(
