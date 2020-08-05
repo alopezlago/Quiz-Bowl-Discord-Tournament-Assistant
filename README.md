@@ -48,7 +48,7 @@ The bot needs to have all of these permissions (give it a role), because it need
 
 #### Running a tournament
 
-  1. A server admin creates your tournament by adding yourself as a TD to a tournament.
+  1. (Optional) A server admin can add others as tournament directors for a tournament.
   
     !addTD @my_user <My tournament name>
 

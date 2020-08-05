@@ -71,7 +71,7 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public static string ErrorSettingCurrentTournament(string guildName, string errorMessage)
         {
-            return $"Error setting the current tournament in guild '{guildName}'. {errorMessage}.";
+            return $"Error setting the current tournament in guild '{guildName}'. {errorMessage}";
         }
 
         public static string ErrorTwoTeamsMustBeSpecifiedFinals(int teamCount)
@@ -121,7 +121,9 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
 
         public static string ReadersTotalForTournament(int readersCount)
         {
-            return $"{readersCount} readers total for the tournament.";
+            return readersCount == 1 ? 
+                $"{readersCount} reader total for the tournament." :
+                $"{readersCount} readers total for the tournament.";
         }
 
         public static string RemovedTournamentDirector(string tournamentName, string guildName)
@@ -147,11 +149,6 @@ namespace QBDiscordAssistant.DiscordBot.DiscordNet
         public static string TooManyTeams(int maximumTeamCount)
         {
             return $"Too many teams. Maximum number of teams: {maximumTeamCount}";
-        }
-
-        public static string TournamentCleanupFinished(string guildName)
-        {
-            return $"Tournament cleanup finished in guild '{guildName}'.";
         }
 
         public static string TournamentDoesNotExist(string tournamentName, string guildName)
